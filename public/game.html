@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tetris 2 – Playing</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="game-wrapper">
+
+    <!-- Header row -->
+    <header class="game-header">
+      <div class="game-title">TETRIS&nbsp;2</div>
+      <div>
+        <span class="mode-badge" id="modeBadge">Score Attack</span>
+        <span id="timerDisplay" class="hidden" style="margin-left:.75rem"></span>
+      </div>
+      <button class="btn btn-ghost" id="homeBtn" style="width:auto;padding:.35rem .9rem;font-size:.8rem">⌂ Home</button>
+    </header>
+
+    <!-- Boards area -->
+    <div class="boards-area">
+
+      <!-- Left side panel -->
+      <div class="side-panel" id="leftPanel">
+        <div class="panel-box">
+          <h3>Score</h3>
+          <div class="val" id="scoreDisplay">0</div>
+        </div>
+        <div class="panel-box">
+          <h3>Level</h3>
+          <div class="val" id="levelDisplay">1</div>
+        </div>
+        <div class="panel-box">
+          <h3>Lines</h3>
+          <div class="val" id="linesDisplay">0</div>
+        </div>
+        <div class="panel-box">
+          <h3>Hold</h3>
+          <canvas id="holdCanvas" class="mini" width="80" height="80"></canvas>
+        </div>
+      </div>
+
+      <!-- Your board -->
+      <div class="board-container" id="myBoardContainer">
+        <div class="board-label" id="myBoardLabel">YOU</div>
+        <canvas id="gameCanvas" width="300" height="600"></canvas>
+        <!-- Countdown overlay -->
+        <div class="board-overlay hidden" id="countdownOverlay">
+          <h2 id="countdownText">3</h2>
+          <p>Get ready!</p>
+        </div>
+        <!-- Pause overlay -->
+        <div class="board-overlay hidden" id="pauseOverlay">
+          <h2>PAUSED</h2>
+          <p>Press P to resume</p>
+        </div>
+      </div>
+
+      <!-- Right side panel (next piece + controls) -->
+      <div class="side-panel" id="rightPanel">
+        <div class="panel-box">
+          <h3>Next</h3>
+          <canvas id="nextCanvas" class="mini" width="80" height="160"></canvas>
+        </div>
+        <div class="panel-box controls-hint" style="font-size:.72rem;line-height:1.9">
+          <div>← → Move</div>
+          <div>↑ Rotate</div>
+          <div>↓ Soft drop</div>
+          <div>Space Hard drop</div>
+          <div>C Hold</div>
+          <div>P Pause</div>
+        </div>
+      </div>
+
+      <!-- Opponent board (hidden in solo) -->
+      <div id="opponentArea" class="hidden" style="display:flex;flex-direction:column;align-items:center">
+        <div class="board-label" id="opponentLabel">OPPONENT</div>
+        <div class="board-container">
+          <canvas id="opponentCanvas" width="150" height="300"></canvas>
+          <div class="board-overlay hidden" id="opponentOverlay">
+            <h2 style="font-size:1.2rem">GAME OVER</h2>
+          </div>
+        </div>
+        <div style="margin-top:.5rem;text-align:center;font-size:.82rem;color:var(--text-dim)">
+          Score: <span id="opponentScore">0</span>
+        </div>
+      </div>
+
+    </div><!-- /boards-area -->
+
+    <!-- Cheat code panel -->
+    <div id="cheatPanel" class="hidden">
+      <h4>🔑 Cheat Code</h4>
+      <div class="cheat-keys" id="cheatKeysDisplay"></div>
+      <div id="cheatStatus"></div>
+    </div>
+
+  </div><!-- /game-wrapper -->
+
+  <div id="notification" class="hidden"></div>
+
+  <script src="/js/network.js"></script>
+  <script src="/js/tetris.js"></script>
+  <script src="/js/cheat.js"></script>
+  <script src="/js/game.js"></script>
+</body>
+</html>

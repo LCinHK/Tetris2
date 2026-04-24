@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tetris 2 – Game Over</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="gameover-wrapper">
+
+    <h1 class="gameover-title" id="goTitle">GAME OVER</h1>
+    <p class="gameover-subtitle" id="goSubtitle">Here's how you did</p>
+
+    <!-- Main score card -->
+    <div class="score-card">
+      <div class="score-label">FINAL SCORE</div>
+      <div class="score-big" id="finalScore">0</div>
+
+      <dl class="stats-grid" id="statsGrid">
+        <dt>Lines Cleared</dt> <dd id="finalLines">0</dd>
+        <dt>Level Reached</dt> <dd id="finalLevel">1</dd>
+        <dt>Game Mode</dt>     <dd id="finalMode">–</dd>
+        <dt>High Score</dt>    <dd id="allTimeHigh">0</dd>
+      </dl>
+    </div>
+
+    <!-- Score history -->
+    <div class="card" style="text-align:left;margin-bottom:1.5rem">
+      <h2 style="margin-bottom:.75rem">📈 Score History</h2>
+      <table class="score-history-table" id="historyTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Score</th>
+            <th>Lines</th>
+            <th>Mode</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr><td colspan="5" style="color:var(--text-dim);text-align:center">No previous scores</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="action-buttons">
+      <button class="btn btn-primary"    id="playAgainBtn">▶ Play Again</button>
+      <button class="btn btn-secondary"  id="homeBtn">⌂ Home</button>
+    </div>
+
+  </div><!-- /gameover-wrapper -->
+
+  <script src="/js/gameover.js"></script>
+</body>
+</html>

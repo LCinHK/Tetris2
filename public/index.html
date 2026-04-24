@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tetris 2 – Competitive Tetris</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="home-wrapper">
+
+    <!-- Header -->
+    <header class="home-header">
+      <h1>TETRIS&nbsp;2</h1>
+      <p>Competitive Multiplayer Tetris</p>
+    </header>
+
+    <!-- Player name -->
+    <div class="name-bar">
+      <label for="playerName">Name:</label>
+      <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+      <button class="btn btn-secondary" id="setNameBtn">Set</button>
+    </div>
+
+    <!-- Create / Join cards -->
+    <div class="cards-grid">
+      <div class="card">
+        <h2>🎮 Create Game</h2>
+        <div class="form-group">
+          <label for="gameModeSelect" style="font-size:.85rem;color:var(--text-dim)">Game Mode</label>
+          <select id="gameModeSelect">
+            <option value="score_attack">Score Attack</option>
+            <option value="time_attack">Time Attack (3 min)</option>
+            <option value="obstacle">Obstacle – send garbage lines</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="createGameBtn">Create Lobby</button>
+      </div>
+
+      <div class="card">
+        <h2>🔗 Join Game</h2>
+        <div class="form-group">
+          <label for="lobbyCodeInput" style="font-size:.85rem;color:var(--text-dim)">Lobby Code</label>
+          <input type="text" id="lobbyCodeInput" placeholder="e.g. ABC123" maxlength="6"
+                 style="text-transform:uppercase;letter-spacing:.1em">
+        </div>
+        <button class="btn btn-secondary" id="joinGameBtn">Join Lobby</button>
+      </div>
+    </div>
+
+    <!-- Lobby panel (hidden until in a lobby) -->
+    <div id="lobbyPanel" class="hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem">
+        <div>
+          <h2 style="margin-bottom:.25rem">Lobby</h2>
+          <div class="lobby-code-display" id="lobbyCodeDisplay">------</div>
+          <div style="font-size:.8rem;color:var(--text-dim)" id="lobbyModeDisplay"></div>
+        </div>
+        <div style="font-size:.8rem;color:var(--text-dim);text-align:right">
+          Share the code above<br>with a friend to compete!
+        </div>
+      </div>
+      <div class="player-list" id="playerList"></div>
+      <div class="flex gap mt" style="margin-top:.75rem">
+        <button class="btn btn-success" id="readyBtn">✔ Ready</button>
+        <button class="btn btn-danger"  id="leaveLobbyBtn">Leave</button>
+      </div>
+      <p id="waitingMsg" style="margin-top:.6rem;font-size:.85rem;color:var(--text-dim)">Waiting for players…</p>
+    </div>
+
+    <!-- Stats + Settings -->
+    <div class="bottom-grid">
+      <div class="card">
+        <h2>📊 Your Stats</h2>
+        <div class="stat-row"><span>Games Played</span><span class="stat-val" id="statGames">0</span></div>
+        <div class="stat-row"><span>High Score</span>   <span class="stat-val" id="statHighScore">0</span></div>
+        <div class="stat-row"><span>Lines Cleared</span><span class="stat-val" id="statLines">0</span></div>
+        <div class="stat-row"><span>Wins / Losses</span><span class="stat-val" id="statWinLoss">0 / 0</span></div>
+        <div style="margin-top:.75rem">
+          <div style="font-size:.75rem;color:var(--text-dim);margin-bottom:.3rem">Recent Scores</div>
+          <ol class="score-history" id="scoreHistory" reversed></ol>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>⚙️ Settings</h2>
+        <div class="setting-row">
+          <input type="checkbox" id="cheatEnabled" checked>
+          <label for="cheatEnabled">Enable Cheat Codes</label>
+        </div>
+        <div class="setting-row">
+          <input type="checkbox" id="soundEnabled" checked>
+          <label for="soundEnabled">Sound Effects</label>
+        </div>
+        <div class="form-group mt">
+          <label style="font-size:.85rem;color:var(--text-dim)">Default Game Mode</label>
+          <select id="defaultMode">
+            <option value="score_attack">Score Attack</option>
+            <option value="time_attack">Time Attack</option>
+            <option value="obstacle">Obstacle</option>
+          </select>
+        </div>
+        <button class="btn btn-secondary mt" id="saveSettingsBtn">Save Settings</button>
+      </div>
+    </div>
+
+  </div><!-- /home-wrapper -->
+
+  <div id="notification" class="hidden"></div>
+
+  <script src="/js/network.js"></script>
+  <script src="/js/home.js"></script>
+</body>
+</html>

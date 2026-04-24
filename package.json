@@ -1,0 +1,16 @@
+{
+  "name": "tetris2",
+  "version": "1.0.0",
+  "description": "Competitive Tetris Game - Node.js multiplayer game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/server.test.js"
+  },
+  "keywords": ["tetris", "game", "multiplayer", "competitive"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2"
+  }
+}
