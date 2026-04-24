@@ -135,6 +135,14 @@ describe('Tetris2 Server', () => {
         });
       });
     });
+
+    it('blocks path traversal attempts with 403', (_, done) => {
+      http.get(`${BASE_URL}/..%2F..%2Fetc%2Fpasswd`, (res) => {
+        assert.ok([403, 404].includes(res.statusCode), `expected 403 or 404, got ${res.statusCode}`);
+        res.resume();
+        done();
+      });
+    });
   });
 
   /* ── WebSocket – connection ────────────────────────────────────── */

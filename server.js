@@ -94,8 +94,17 @@ const server = http.createServer((req, res) => {
   let urlPath = req.url.split('?')[0];
   if (urlPath === '/') urlPath = '/index.html';
 
-  const filePath = path.join(__dirname, 'public', urlPath);
-  const ext = path.extname(filePath);
+  const publicDir = path.join(__dirname, 'public');
+  const filePath  = path.join(publicDir, urlPath);
+
+  // Prevent path traversal: resolved path must stay inside public/
+  if (!filePath.startsWith(publicDir + path.sep) && filePath !== publicDir) {
+    res.writeHead(403, { 'Content-Type': 'text/html' });
+    res.end('<h1>403 – Forbidden</h1>');
+    return;
+  }
+
+  const ext  = path.extname(filePath);
   const mime = MIME[ext] || 'text/plain';
 
   fs.readFile(filePath, (err, data) => {

@@ -25,7 +25,7 @@
   // If the player won (server sets stats.wins), show winner message
   // We detect a "win" if this score equals the most recent win entry
   // Simple heuristic: if this score is non-zero, just show "Game Over"
-  if (title) title.textContent = lastGame.score > 0 ? 'GAME OVER' : 'GAME OVER';
+  if (title) title.textContent = 'GAME OVER';
   if (subtitle) {
     const lines = lastGame.linesCleared || 0;
     subtitle.textContent = lines >= 30

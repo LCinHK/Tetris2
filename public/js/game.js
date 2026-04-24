@@ -228,7 +228,7 @@
     } else if (msg.cheatType === 'opponent_obfuscate') {
       notify('👁 Opponent obfuscated for 10s!', 'success');
     }
-    if (msg.nextCheatCode) cheat.updateNextSequence(msg.nextCheatCode);
+    if (msg.nextCheatCode) cheat.setSequence(msg.nextCheatCode);
   });
 
   Network.on('cheat_effect', (msg) => {
@@ -245,7 +245,7 @@
 
   Network.on('game_start', (msg) => {
     // In case we receive this while on game page (reconnect scenario)
-    if (msg.cheatCode) cheat.updateNextSequence(msg.cheatCode);
+    if (msg.cheatCode) cheat.setSequence(msg.cheatCode);
   });
 
   /* ── Home button ─────────────────────────────────────────────── */

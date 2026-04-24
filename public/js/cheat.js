@@ -92,11 +92,6 @@
       this._renderKeys();
     }
 
-    /* Called by game.js when server sends next code */
-    updateNextSequence(seq) {
-      this.setSequence(seq);
-    }
-
     isActive() { return this._active; }
 
     /* ── UI helpers ─────────────────────────────────────────────── */
