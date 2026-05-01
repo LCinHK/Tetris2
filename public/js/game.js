@@ -54,10 +54,9 @@
   const TIME_ATTACK_DURATION = 3 * 60 * 1000; // 3 minutes
   let timerEnd = 0;
   let timerInterval = null;
+  let timerRemaining = 0; // ms remaining when paused
 
-  function startTimer() {
-    timerEnd = Date.now() + TIME_ATTACK_DURATION;
-    timerDisplay.classList.remove('hidden');
+  function _runTimerInterval() {
     timerInterval = setInterval(() => {
       const left = Math.max(0, timerEnd - Date.now());
       const m = Math.floor(left / 60000);
@@ -65,12 +64,23 @@
       timerDisplay.textContent = `${m}:${s.toString().padStart(2, '0')}`;
       if (left <= 0) {
         clearInterval(timerInterval);
+        timerInterval = null;
         endGame();
       }
     }, 250);
   }
 
+  function startTimer() {
+    timerEnd = Date.now() + TIME_ATTACK_DURATION;
+    timerDisplay.classList.remove('hidden');
+    _runTimerInterval();
+  }
+
   /* ── Create game instance ────────────────────────────────────── */
+  let _lastPieceMoveSend = 0;
+  let _opponentGameOver  = false;
+  let _gameEnded         = false;
+
   const game = new TetrisGame(gameCanvas, {
     cellSize: 30,
     nextCanvas,
@@ -84,6 +94,20 @@
       Network.send({ type: 'lines_cleared', count, score });
     },
     onBoardUpdate(board) {
+      // Always send after a piece locks (board state finalised)
+      Network.send({
+        type: 'game_update',
+        board,
+        score: game.score,
+        level: game.level,
+        lines: game.lines,
+      });
+    },
+    onPieceMoved(board) {
+      // Throttle to ~20 fps to avoid flooding the network
+      const now = Date.now();
+      if (now - _lastPieceMoveSend < 50) return;
+      _lastPieceMoveSend = now;
       Network.send({
         type: 'game_update',
         board,
@@ -142,6 +166,17 @@
     if (pauseOverlay) {
       paused ? pauseOverlay.classList.remove('hidden') : pauseOverlay.classList.add('hidden');
     }
+    // Pause / resume the Time Attack countdown so time doesn't drain while paused
+    if (gameMode === 'time_attack') {
+      if (paused) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        timerRemaining = Math.max(0, timerEnd - Date.now());
+      } else if (timerRemaining > 0) {
+        timerEnd = Date.now() + timerRemaining;
+        _runTimerInterval();
+      }
+    }
   }
 
   /* ── Countdown then start ────────────────────────────────────── */
@@ -167,12 +202,28 @@
 
   /* ── End game ────────────────────────────────────────────────── */
   function endGame(score, lines, level) {
+    if (_gameEnded) return;
+    _gameEnded = true;
+
     clearInterval(timerInterval);
+    timerInterval = null;
     cheat.detach();
 
     const finalScore = score  !== undefined ? score  : game.score;
     const finalLines = lines  !== undefined ? lines  : game.lines;
     const finalLevel = level  !== undefined ? level  : game.level;
+
+    // Determine match outcome for the game-over page
+    let result;
+    if (isSolo) {
+      result = gameMode === 'time_attack' ? 'time_up' : 'solo';
+    } else if (_opponentGameOver) {
+      result = 'win';
+    } else if (gameMode === 'time_attack') {
+      result = 'time_up';
+    } else {
+      result = 'loss';
+    }
 
     Network.send({
       type: 'game_over',
@@ -187,6 +238,7 @@
       linesCleared: finalLines,
       level: finalLevel,
       gameMode,
+      result,
     }));
 
     // Wait for server to confirm with full stats, then navigate
@@ -204,10 +256,13 @@
     if (opponentArea && !opponentArea.classList.contains('hidden')) {
       if (msg.board) drawOpponentBoard(opponentCanvas, msg.board);
       if (opponentScore) opponentScore.textContent = (msg.score || 0).toLocaleString();
+      _setText('opponentLevel', msg.level || 1);
+      _setText('opponentLines', msg.lines || 0);
     }
   });
 
   Network.on('opponent_game_over', (msg) => {
+    _opponentGameOver = true;
     const overlay = document.getElementById('opponentOverlay');
     if (overlay) overlay.classList.remove('hidden');
     notify(`Opponent finished with ${(msg.score || 0).toLocaleString()} pts! You win!`, 'success');

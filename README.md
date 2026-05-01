@@ -27,6 +27,9 @@ A real-time, two-player competitive Tetris game built entirely with Node.js and 
 - ⚙️ **Persistent settings** (cheat on/off, sound on/off, default game mode) stored per WebSocket session
 - 🛡️ Path-traversal protection on the static file server
 - ✅ Unit-tested server with Node.js built-in test runner (no extra test framework)
+- 👀 **Real-time opponent board** — see your opponent's active piece and board state live as they play
+- ⏸️ **Pause-safe Time Attack** — the countdown freezes while paused and resumes with the exact remaining time
+- 🏆 **Clear match outcomes** — the game-over screen shows Win / Loss / Time's Up based on how the game ended
 
 ---
 
@@ -201,3 +204,14 @@ All messages are JSON objects with a `type` field.
 | `settings_saved` | `settings` | Settings persisted |
 | `settings` | `settings` | Response to `get_settings` |
 | `error` | `message` | Error message (e.g. lobby not found) |
+
+---
+
+## Known Limitations
+
+| Area | Status | Notes |
+|---|---|---|
+| **Sound effects** | ⚠️ Placeholder only | `soundEnabled` is persisted as a setting but no audio files or `AudioContext` playback is wired up. Browser audio requires user-gesture activation and asset files; left as a future enhancement. |
+| **Time Attack winner** | ⚠️ Partial | Both clients count down independently. The server awards a win/loss to whoever submits `game_over` last (the other player still playing at that moment). In practice times are nearly identical, but a future improvement would be a server-side adjudication message comparing both scores after both clocks expire. |
+| **Play Again (multiplayer)** | ⚠️ Redirect only | After a game ends the lobby is closed. "Play Again" returns to the home page where a fresh lobby must be created. Full in-place lobby restart would require additional server logic. |
+| **Mobile / touch controls** | ❌ Not implemented | Gameplay is keyboard-only. Touch/swipe support would need on-screen buttons or gesture detection. |
