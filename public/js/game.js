@@ -116,9 +116,18 @@
 
   /* ── Keyboard controls ───────────────────────────────────────── */
   let hardDropLocked = false;
+  let gameStarted = false;
 
   document.addEventListener('keydown', (e) => {
     if (game.isGameOver) return;
+
+    // During countdown (before start), ignore all gameplay inputs.
+    if (!gameStarted) {
+      if (['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', ' ', 'c', 'C', 'p', 'P'].includes(e.key)) {
+        e.preventDefault();
+      }
+      return;
+    }
 
     // While paused, only allow unpausing.
     if (game.isPaused && !(e.key === 'p' || e.key === 'P')) {
@@ -179,6 +188,7 @@
         clearInterval(_countdownTick);
         _countdownTick = null;
         countdownOverlay.classList.add('hidden');
+        gameStarted = true;
         game.start(seed);
         if (gameMode === 'time_attack') startTimer();
       }
