@@ -225,10 +225,18 @@
     }
 
     /* ── Public controls ─────────────────────────────────────── */
-    moveLeft()  { if (this._fits(this.currentPiece, -1, 0)) { this.currentPiece.x--; this._updateGhost(); this._draw(); } }
-    moveRight() { if (this._fits(this.currentPiece,  1, 0)) { this.currentPiece.x++; this._updateGhost(); this._draw(); } }
+    moveLeft()  {
+      if (this.isPaused || this.isGameOver) return;
+      if (this._fits(this.currentPiece, -1, 0)) { this.currentPiece.x--; this._updateGhost(); this._draw(); }
+    }
+
+    moveRight() {
+      if (this.isPaused || this.isGameOver) return;
+      if (this._fits(this.currentPiece,  1, 0)) { this.currentPiece.x++; this._updateGhost(); this._draw(); }
+    }
 
     softDrop() {
+      if (this.isPaused || this.isGameOver) return;
       if (this._fits(this.currentPiece, 0, 1)) {
         this.currentPiece.y++;
         this._lastDrop = performance.now();
@@ -239,11 +247,13 @@
     }
 
     hardDrop() {
+      if (this.isPaused || this.isGameOver) return;
       while (this._fits(this.currentPiece, 0, 1)) this.currentPiece.y++;
       this._lock();
     }
 
     rotate() {
+      if (this.isPaused || this.isGameOver) return;
       const p   = this.currentPiece;
       const rot = rotateCW(p.shape);
       const newRot = (p.rot + 1) % 4;
@@ -271,6 +281,7 @@
     }
 
     hold() {
+      if (this.isPaused || this.isGameOver) return;
       if (this.holdUsed) return;
       if (!this.holdPiece) {
         this.holdPiece = this._makePiece(this.currentPiece.key);

@@ -119,6 +119,15 @@
 
   document.addEventListener('keydown', (e) => {
     if (game.isGameOver) return;
+
+    // While paused, only allow unpausing.
+    if (game.isPaused && !(e.key === 'p' || e.key === 'P')) {
+      // Prevent browser scrolling on arrow keys/space.
+      if (['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', ' '].includes(e.key)) {
+        e.preventDefault();
+      }
+      return;
+    }
     switch (e.key) {
       case 'ArrowLeft':  e.preventDefault(); game.moveLeft();  break;
       case 'ArrowRight': e.preventDefault(); game.moveRight(); break;
