@@ -13,8 +13,25 @@
   try { settings = JSON.parse(localStorage.getItem('settings') || '{}'); } catch (_) {}
 
   const gameMode = gameConfig.gameMode || 'score_attack';
-  const seed     = gameConfig.seed     || Math.floor(Math.random() * 1e6);
   const isSolo   = !gameConfig.players || gameConfig.players.length < 2;
+
+  function _randomSeed() {
+    // Prefer cryptographically-strong randomness when available.
+    try {
+      if (window.crypto && window.crypto.getRandomValues) {
+        const buf = new Uint32Array(1);
+        window.crypto.getRandomValues(buf);
+        return buf[0] >>> 0;
+      }
+    } catch (_) {}
+    return Math.floor(Math.random() * 0xFFFFFFFF) >>> 0;
+  }
+
+  // Multiplayer should be deterministic (server-provided seed for fairness).
+  // Solo should feel fresh: generate a new seed each load so the initial piece varies.
+  const seed = isSolo
+    ? _randomSeed()
+    : (gameConfig.seed || _randomSeed());
 
   /* ── DOM refs ─────────────────────────────────────────────────── */
   const gameCanvas     = document.getElementById('gameCanvas');
@@ -74,6 +91,7 @@
   /* ── Create game instance ────────────────────────────────────── */
   const game = new TetrisGame(gameCanvas, {
     cellSize: 30,
+    seed,
     nextCanvas,
     holdCanvas,
     onScoreUpdate({ score, lines, level }) {
