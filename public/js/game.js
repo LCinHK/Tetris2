@@ -56,6 +56,7 @@
   let timerInterval = null;
 
   function startTimer() {
+    clearInterval(timerInterval);
     timerEnd = Date.now() + TIME_ATTACK_DURATION;
     timerDisplay.classList.remove('hidden');
     timerInterval = setInterval(() => {
@@ -145,19 +146,29 @@
   }
 
   /* ── Countdown then start ────────────────────────────────────── */
+  let _booted = false;
+  let _bootFallbackTimer = null;
+  let _countdownTick = null;
+
   function startWithCountdown() {
+    if (_countdownTick) {
+      clearInterval(_countdownTick);
+      _countdownTick = null;
+    }
+
     countdownOverlay.classList.remove('hidden');
     let count = 3;
     countdownText.textContent = count;
 
-    const tick = setInterval(() => {
+    _countdownTick = setInterval(() => {
       count--;
       if (count > 0) {
         countdownText.textContent = count;
       } else if (count === 0) {
         countdownText.textContent = 'GO!';
       } else {
-        clearInterval(tick);
+        clearInterval(_countdownTick);
+        _countdownTick = null;
         countdownOverlay.classList.add('hidden');
         game.start(seed);
         if (gameMode === 'time_attack') startTimer();
@@ -273,6 +284,12 @@
   /* ── Boot ─────────────────────────────────────────────────────── */
   // If network already open, start immediately; otherwise wait
   function boot() {
+    if (_booted) return;
+    _booted = true;
+    if (_bootFallbackTimer) {
+      clearTimeout(_bootFallbackTimer);
+      _bootFallbackTimer = null;
+    }
     startWithCountdown();
   }
 
@@ -281,7 +298,7 @@
   } else {
     Network.on('open', boot);
     // Fallback: if WS takes too long, still start the game
-    setTimeout(() => {
+    _bootFallbackTimer = setTimeout(() => {
       if (!game._raf && !game.isGameOver) boot();
     }, 2000);
   }
