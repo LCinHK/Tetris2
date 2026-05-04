@@ -1,5 +1,28 @@
 /**
- * game.js – Game page logic
+ * game.js – Active gameplay page controller
+ *
+ * Orchestrates everything that happens on `game.html` while a match is
+ * in progress.
+ *
+ * Responsibilities:
+ *  - Reads the game configuration (seed, gameMode, players) from
+ *    `localStorage` so it survives the redirect from the lobby.
+ *  - Instantiates `TetrisGame` on the player's canvas and, in multiplayer,
+ *    a read-only mirror canvas for the opponent's board.
+ *  - Runs the pre-game countdown (3-2-1-GO) before starting the engine.
+ *  - Wires all keyboard input: arrow keys for movement, Z/X/C for
+ *    rotate/hold/hard-drop, P for pause, and arrow keys forwarded to the
+ *    `CheatManager` for cheat-code detection.
+ *  - Handles all incoming WebSocket messages: opponent board sync,
+ *    garbage lines (Obstacle mode), cheat activation/effect, and
+ *    opponent game-over notifications.
+ *  - Sends `game_update` (board state) to the server on each lock event
+ *    and `game_over` when the local player's game ends.
+ *  - Manages the Time Attack countdown timer and triggers game-over when
+ *    the timer expires.
+ *  - Persists match results to `localStorage` before redirecting to
+ *    `gameover.html`.
+ *
  * Depends on: network.js, tetris.js, cheat.js
  */
 (function () {

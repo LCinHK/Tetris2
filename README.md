@@ -79,6 +79,27 @@ Tetris2/
 - Handles the full WebSocket lifecycle (connect → lobby → game → game-over → disconnect)
 - Implements all game logic: lobby management, game start (shared seed for deterministic RNG), garbage-line dispatch, cheat-code validation, and stats tracking
 
+**`public/index.html`** — home / lobby page:
+- Entry point of the application; rendered when a player first visits the site
+- Contains the player-name input, game-mode selector, and lobby create/join controls
+- Houses the lobby panel (lobby code display, player list, Ready button) and the settings panel
+- Loads `network.js` then `home.js`
+
+**`public/game.html`** — active gameplay page:
+- Rendered when a match is in progress; navigated to programmatically after `game_start`
+- Contains the player's main canvas, the opponent's mirror canvas, the next-piece and hold-piece preview canvases, score/level/lines HUD, and cheat-code panel
+- Loads `network.js`, `tetris.js`, `cheat.js`, then `game.js`
+
+**`public/gameover.html`** — post-match results page:
+- Rendered after the game ends; navigated to by `game.js` with results in `localStorage`
+- Displays the final score, lines cleared, level, game mode, and cumulative session statistics
+- Loads `network.js` then `gameover.js`
+
+**`public/css/style.css`** — global stylesheet:
+- Single stylesheet used by all three HTML pages
+- Implements a dark-theme design with CSS custom properties (variables) for colours and spacing
+- Covers layout (flex/grid), canvas sizing, HUD elements, buttons, panels, and responsive adjustments
+
 **`public/js/tetris.js`** — self-contained Tetris engine:
 - `TetrisGame` class instantiated on a `<canvas>` element
 - 7-bag random piece generator using a seeded Mulberry32 PRNG (so both players draw identical piece sequences)
@@ -90,6 +111,31 @@ Tetris2/
 - Connects to the server over `ws://` or `wss://` depending on the page protocol
 - Provides `Network.on(type, fn)` / `Network.send(obj)` event-bus API
 - Restores the player's last-used name from `localStorage`
+
+**`public/js/game.js`** — active gameplay controller:
+- Reads the shared game seed, game mode, and player list from `localStorage`
+- Runs the pre-game countdown (3-2-1-GO) then starts the `TetrisGame` engine
+- Maps keyboard input (arrow keys, Z/X/C/P) to game actions and forwards arrow keys to `CheatManager`
+- Syncs the local board state to the server and renders the opponent's board from incoming `opponent_update` messages
+- Manages the Time Attack timer; handles `add_garbage`, cheat effects, and opponent game-over events
+- Saves results to `localStorage` and navigates to `gameover.html` when the match ends
+
+**`public/js/home.js`** — home / lobby page controller:
+- Wires all interactive controls on `index.html`: name input, game-mode selector, create/join buttons, Ready button, and settings panel
+- Communicates with the server to create and join lobbies, receive live player-list updates, and wait for `game_start`
+- Fetches and renders per-session statistics (games, wins, high score, recent scores)
+- Persists user settings (cheats, sound, default mode) via the server and `localStorage`
+
+**`public/js/cheat.js`** — cheat-code detection system:
+- `CheatManager` class that tracks the player's arrow-key input against the current required sequence
+- Fires `onActivate` when the full sequence is entered, then waits for the server to confirm with `cheat_activated`
+- Reports progress (how many keys matched so far) via `onProgress` so the UI can highlight the sequence
+- Auto-deactivates after the server-specified duration; supports escalating sequences
+
+**`test/server.test.js`** — server unit-test suite:
+- Uses Node.js's built-in `node:test` runner — no extra test framework required
+- Spins up a real HTTP + WebSocket server on a random port, runs all tests, then tears down cleanly
+- Coverage includes: static file serving, path-traversal blocking, WebSocket lifecycle, lobby create/join/leave/full, game start, cheat-code validation, game-over stat recording, settings save/restore, and Obstacle-mode garbage lines
 
 ---
 

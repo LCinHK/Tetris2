@@ -1,6 +1,21 @@
 /**
  * tetris.js – Core Tetris game engine (no external dependencies)
  *
+ * Encapsulates the complete client-side game logic inside an IIFE so that
+ * nothing leaks to the global scope.  Exposes a single global: `TetrisGame`.
+ *
+ * Responsibilities:
+ *  - Defines all seven tetrominoes (SRS shapes & colours).
+ *  - Implements the 7-bag random piece generator with a seeded Mulberry32
+ *    PRNG so both players in a multiplayer match draw identical sequences.
+ *  - Full SRS (Super Rotation System) wall-kick tables for J, L, S, T, Z
+ *    and the I-piece.
+ *  - `TetrisGame` class: collision detection, piece locking, line-clearing,
+ *    ghost piece, hold-piece, next-piece preview, scoring (with level
+ *    multiplier), game-loop via `requestAnimationFrame`, and Canvas rendering.
+ *  - `addGarbageLines(n)` – injects n garbage rows (Obstacle mode).
+ *  - `activateScoreBoost(ms)` – doubles scoring for `ms` milliseconds.
+ *
  * Usage:
  *   const game = new TetrisGame(canvas, options);
  *   game.start();

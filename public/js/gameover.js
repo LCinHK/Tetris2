@@ -1,6 +1,17 @@
 /**
- * gameover.js – Game Over page logic
- * Reads results from localStorage and renders the game over screen.
+ * gameover.js – Game Over page controller
+ *
+ * Reads match results and session statistics from `localStorage` (written by
+ * `game.js` just before redirecting) and renders the game-over screen on
+ * `gameover.html`.
+ *
+ * Responsibilities:
+ *  - Displays the player's final score, lines cleared, level reached, and
+ *    the game mode that was played.
+ *  - Shows cumulative session stats: total games, wins, losses, overall high
+ *    score, and a scrollable recent-score history chart.
+ *  - Provides "Play Again" (returns to the lobby) and "Home" navigation
+ *    buttons.
  */
 (function () {
   'use strict';

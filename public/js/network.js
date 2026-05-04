@@ -1,6 +1,20 @@
 /**
- * network.js – Shared WebSocket client
- * Connects to the server and exposes a simple message bus.
+ * network.js – Shared WebSocket client wrapper
+ *
+ * Loaded on every page before any page-specific script.  Establishes a
+ * single persistent WebSocket connection to the server and provides a
+ * lightweight publish/subscribe message bus via `Network.on()` and
+ * `Network.send()`.
+ *
+ * Responsibilities:
+ *  - Auto-selects `ws://` or `wss://` based on the page protocol.
+ *  - Restores the player's last-used name from `localStorage` and sends
+ *    it to the server as soon as the socket opens.
+ *  - Stores the server-assigned `clientId` for the lifetime of the page.
+ *  - Exposes `Network.on(type, fn)` to register message handlers and
+ *    `Network.send(obj)` to send JSON messages to the server.
+ *
+ * Depends on: nothing (must be the first script loaded)
  * Loaded on every page; individual page scripts add handlers via Network.on().
  */
 (function () {

@@ -1,5 +1,22 @@
 /**
- * home.js – Home page logic
+ * home.js – Home / lobby page controller
+ *
+ * Drives all interactive elements on `index.html` before a match starts.
+ *
+ * Responsibilities:
+ *  - Lets the player set (or update) their display name, which is sent to
+ *    the server via `set_name` and stored in `localStorage`.
+ *  - Handles lobby creation (`create_lobby`) and joining (`join_lobby`),
+ *    showing and hiding the lobby panel with the 4-character lobby code and
+ *    live player list as others join.
+ *  - Sends `player_ready` when the player clicks Ready; waits for the server
+ *    to broadcast `game_start` before navigating to `game.html`.
+ *  - Fetches and renders per-session statistics (games played, wins, high
+ *    score, lines cleared, recent scores) from the server (`get_stats`).
+ *  - Saves and restores user settings (cheat enabled, sound enabled, default
+ *    game mode) via `save_settings` / `get_settings` WebSocket messages and
+ *    `localStorage` caching.
+ *
  * Depends on: network.js (loaded before this)
  */
 (function () {

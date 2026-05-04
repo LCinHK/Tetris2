@@ -1,3 +1,24 @@
+/**
+ * server.js – HTTP + WebSocket back-end for Tetris 2
+ *
+ * Responsibilities:
+ *  - Serves all static files from the `public/` directory with MIME-type
+ *    detection and path-traversal protection.
+ *  - Exposes `GET /api/stats` returning a JSON array of every connected
+ *    player's session statistics.
+ *  - Manages in-memory server state: `players` map (id → player/socket),
+ *    `lobbies` map (code → lobby), and `playerStats` map (id → stats).
+ *  - Handles the complete WebSocket lifecycle:
+ *      connect → set name → create/join lobby → ready → game start
+ *      → in-game updates → game over → disconnect / leave
+ *  - Implements all game-coordination logic:
+ *      lobby management, shared deterministic seed generation, garbage-line
+ *      dispatch (Obstacle mode), cheat-code validation & escalation, and
+ *      per-session stats tracking (games played, wins, high score, etc.).
+ *
+ * Entry point: `npm start`  (runs `node server.js`)
+ * Tests:       `npm test`   (runs `test/server.test.js`)
+ */
 'use strict';
 
 const http = require('http');
