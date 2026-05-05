@@ -13,8 +13,25 @@
   try { settings = JSON.parse(localStorage.getItem('settings') || '{}'); } catch (_) {}
 
   const gameMode = gameConfig.gameMode || 'score_attack';
-  const seed     = gameConfig.seed     || Math.floor(Math.random() * 1e6);
   const isSolo   = !gameConfig.players || gameConfig.players.length < 2;
+
+  function _randomSeed() {
+    // Prefer cryptographically-strong randomness when available.
+    try {
+      if (window.crypto && window.crypto.getRandomValues) {
+        const buf = new Uint32Array(1);
+        window.crypto.getRandomValues(buf);
+        return buf[0] >>> 0;
+      }
+    } catch (_) {}
+    return Math.floor(Math.random() * 0xFFFFFFFF) >>> 0;
+  }
+
+  // Multiplayer should be deterministic (server-provided seed for fairness).
+  // Solo should feel fresh: generate a new seed each load so the initial piece varies.
+  const seed = isSolo
+    ? _randomSeed()
+    : (gameConfig.seed || _randomSeed());
 
   /* ── DOM refs ─────────────────────────────────────────────────── */
   const gameCanvas     = document.getElementById('gameCanvas');
@@ -71,6 +88,7 @@
   }
 
   function startTimer() {
+    clearInterval(timerInterval);
     timerEnd = Date.now() + TIME_ATTACK_DURATION;
     timerDisplay.classList.remove('hidden');
     _runTimerInterval();
@@ -83,6 +101,7 @@
 
   const game = new TetrisGame(gameCanvas, {
     cellSize: 30,
+    seed,
     nextCanvas,
     holdCanvas,
     onScoreUpdate({ score, lines, level }) {
@@ -139,9 +158,27 @@
 
   /* ── Keyboard controls ───────────────────────────────────────── */
   let hardDropLocked = false;
+  let gameStarted = false;
 
   document.addEventListener('keydown', (e) => {
     if (game.isGameOver) return;
+
+    // During countdown (before start), ignore all gameplay inputs.
+    if (!gameStarted) {
+      if (['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', ' ', 'c', 'C', 'p', 'P'].includes(e.key)) {
+        e.preventDefault();
+      }
+      return;
+    }
+
+    // While paused, only allow unpausing.
+    if (game.isPaused && !(e.key === 'p' || e.key === 'P')) {
+      // Prevent browser scrolling on arrow keys/space.
+      if (['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', ' '].includes(e.key)) {
+        e.preventDefault();
+      }
+      return;
+    }
     switch (e.key) {
       case 'ArrowLeft':  e.preventDefault(); game.moveLeft();  break;
       case 'ArrowRight': e.preventDefault(); game.moveRight(); break;
@@ -180,20 +217,31 @@
   }
 
   /* ── Countdown then start ────────────────────────────────────── */
+  let _booted = false;
+  let _bootFallbackTimer = null;
+  let _countdownTick = null;
+
   function startWithCountdown() {
+    if (_countdownTick) {
+      clearInterval(_countdownTick);
+      _countdownTick = null;
+    }
+
     countdownOverlay.classList.remove('hidden');
     let count = 3;
     countdownText.textContent = count;
 
-    const tick = setInterval(() => {
+    _countdownTick = setInterval(() => {
       count--;
       if (count > 0) {
         countdownText.textContent = count;
       } else if (count === 0) {
         countdownText.textContent = 'GO!';
       } else {
-        clearInterval(tick);
+        clearInterval(_countdownTick);
+        _countdownTick = null;
         countdownOverlay.classList.add('hidden');
+        gameStarted = true;
         game.start(seed);
         if (gameMode === 'time_attack') startTimer();
       }
@@ -328,6 +376,12 @@
   /* ── Boot ─────────────────────────────────────────────────────── */
   // If network already open, start immediately; otherwise wait
   function boot() {
+    if (_booted) return;
+    _booted = true;
+    if (_bootFallbackTimer) {
+      clearTimeout(_bootFallbackTimer);
+      _bootFallbackTimer = null;
+    }
     startWithCountdown();
   }
 
@@ -336,7 +390,7 @@
   } else {
     Network.on('open', boot);
     // Fallback: if WS takes too long, still start the game
-    setTimeout(() => {
+    _bootFallbackTimer = setTimeout(() => {
       if (!game._raf && !game.isGameOver) boot();
     }, 2000);
   }

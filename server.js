@@ -148,6 +148,7 @@ wss.on('connection', (ws) => {
   players.set(clientId, {
     id: clientId,
     name: `Player${clientIdCounter}`,
+    hasCustomName: false,
     ws,
     lobbyCode: null,
     settings: { cheatEnabled: true, soundEnabled: true },
@@ -217,8 +218,15 @@ function handleMessage(ws, msg) {
 ───────────────────────────────────────── */
 function handleSetName(clientId, msg) {
   const player = players.get(clientId);
-  const name = (msg.name || '').trim().slice(0, 20) || player.name;
+  const name = (msg.name || '').trim().slice(0, 20);
+
+  if (!name) {
+    sendTo(clientId, { type: 'error', message: 'Please set your name first.' });
+    return;
+  }
+
   player.name = name;
+  player.hasCustomName = true;
   const stats = playerStats.get(clientId);
   if (stats) stats.name = name;
   sendTo(clientId, { type: 'name_set', name });
@@ -226,6 +234,10 @@ function handleSetName(clientId, msg) {
 
 function handleCreateLobby(clientId, msg) {
   const player = players.get(clientId);
+  if (!player.hasCustomName) {
+    sendTo(clientId, { type: 'error', message: 'Please set your name first.' });
+    return;
+  }
   if (player.lobbyCode) leaveLobby(clientId, player.lobbyCode);
 
   let code;
@@ -253,6 +265,7 @@ function handleCreateLobby(clientId, msg) {
 
 function handleJoinLobby(clientId, msg) {
   const player = players.get(clientId);
+  if (!player.hasCustomName) return sendTo(clientId, { type: 'error', message: 'Please set your name first.' });
   const code = (msg.code || '').toUpperCase().trim();
   const lobby = lobbies.get(code);
 

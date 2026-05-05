@@ -29,7 +29,6 @@
           const msg = JSON.parse(ev.data);
           if (msg.type === 'connected') {
             this.clientId = msg.clientId;
-            if (!this.playerName) this.playerName = msg.playerName;
           }
           this._emit(msg.type, msg);
           this._emit('*', msg);
