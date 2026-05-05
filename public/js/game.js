@@ -214,19 +214,39 @@
     let count = 3;
     countdownText.textContent = count;
 
-    const tick = setInterval(() => {
+    let tick = null;
+    let gamestartPlaying = false;
+
+    function proceedToStart() {
+      if (tick) { clearInterval(tick); tick = null; }
+      countdownOverlay.classList.add('hidden');
+      playBgm();
+      game.start(seed);
+      if (gameMode === 'time_attack') startTimer();
+      gamestartPlaying = false;
+    }
+
+    tick = setInterval(() => {
       count--;
       if (count > 0) {
         countdownText.textContent = count;
       } else if (count === 0) {
         countdownText.textContent = 'GO!';
-        playGameStartSound();
+        if (gamestartSound) {
+          gamestartPlaying = true;
+          try {
+            gamestartSound.currentTime = 0;
+            const p = gamestartSound.play();
+            if (p && typeof p.catch === 'function') p.catch(() => proceedToStart());
+          } catch (_) {
+            proceedToStart();
+          }
+          gamestartSound.onended = proceedToStart;
+        } else {
+          // no start sound — fall back to the original next-tick start
+        }
       } else {
-        clearInterval(tick);
-        countdownOverlay.classList.add('hidden');
-        playBgm();
-        game.start(seed);
-        if (gameMode === 'time_attack') startTimer();
+        if (!gamestartPlaying) proceedToStart();
       }
     }, 900);
   }
