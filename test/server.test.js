@@ -78,6 +78,11 @@ function nextMessage(ws) { return ws.nextMsg(); }
 /** Wait for a message of a specific type */
 function waitForType(ws, type) { return ws.nextMsg(m => m.type === type); }
 
+async function setName(ws, name = 'Alice') {
+  send(ws, { type: 'set_name', name });
+  return waitForType(ws, 'name_set');
+}
+
 /* ─────────────────────────────────────────
    Suite
 ───────────────────────────────────────── */
@@ -197,9 +202,19 @@ describe('Tetris2 Server', () => {
 
   /* ── Lobby create / join / leave ──────────────────────────────── */
   describe('Lobby management', () => {
+    it('rejects creating a lobby without setting a name', async () => {
+      const ws  = await wsConnect();
+      await nextMessage(ws);
+      send(ws, { type: 'create_lobby' });
+      const resp = await waitForType(ws, 'error');
+      assert.ok(resp.message.toLowerCase().includes('name'));
+      ws.close();
+    });
+
     it('creates a lobby and returns a code', async () => {
       const ws  = await wsConnect();
       await nextMessage(ws);
+      await setName(ws, 'Alice');
       send(ws, { type: 'create_lobby', gameMode: 'score_attack' });
       const resp = await waitForType(ws, 'lobby_created');
       assert.ok(resp.code, 'should return lobby code');
@@ -211,11 +226,13 @@ describe('Tetris2 Server', () => {
     it('allows a second player to join', async () => {
       const ws1 = await wsConnect();
       await nextMessage(ws1);
+      await setName(ws1, 'Alice');
       send(ws1, { type: 'create_lobby', gameMode: 'score_attack' });
       const created = await waitForType(ws1, 'lobby_created');
 
       const ws2 = await wsConnect();
       await nextMessage(ws2);
+      await setName(ws2, 'Bob');
       send(ws2, { type: 'join_lobby', code: created.code });
       const joined = await waitForType(ws2, 'lobby_joined');
       assert.equal(joined.code, created.code);
@@ -226,6 +243,7 @@ describe('Tetris2 Server', () => {
     it('rejects join for non-existent lobby', async () => {
       const ws = await wsConnect();
       await nextMessage(ws);
+      await setName(ws, 'Alice');
       send(ws, { type: 'join_lobby', code: 'XXXXXX' });
       const resp = await waitForType(ws, 'error');
       assert.ok(resp.message.includes('not found'), `unexpected message: ${resp.message}`);
@@ -235,16 +253,19 @@ describe('Tetris2 Server', () => {
     it('rejects joining a full lobby', async () => {
       const ws1 = await wsConnect();
       await nextMessage(ws1);
+      await setName(ws1, 'Alice');
       send(ws1, { type: 'create_lobby' });
       const created = await waitForType(ws1, 'lobby_created');
 
       const ws2 = await wsConnect();
       await nextMessage(ws2);
+      await setName(ws2, 'Bob');
       send(ws2, { type: 'join_lobby', code: created.code });
       await waitForType(ws2, 'lobby_joined');
 
       const ws3 = await wsConnect();
       await nextMessage(ws3);
+      await setName(ws3, 'Carol');
       send(ws3, { type: 'join_lobby', code: created.code });
       const resp = await waitForType(ws3, 'error');
       assert.ok(resp.message.toLowerCase().includes('full'));
@@ -254,6 +275,7 @@ describe('Tetris2 Server', () => {
     it('removes lobby when last player leaves', async () => {
       const ws = await wsConnect();
       await nextMessage(ws);
+      await setName(ws, 'Alice');
       send(ws, { type: 'create_lobby' });
       const { code } = await waitForType(ws, 'lobby_created');
       assert.ok(lobbies.has(code));
@@ -269,6 +291,7 @@ describe('Tetris2 Server', () => {
     it('starts game when solo player is ready', async () => {
       const ws = await wsConnect();
       await nextMessage(ws);
+      await setName(ws, 'Alice');
       send(ws, { type: 'create_lobby', gameMode: 'score_attack' });
       await waitForType(ws, 'lobby_created');
       send(ws, { type: 'player_ready' });
@@ -282,6 +305,7 @@ describe('Tetris2 Server', () => {
     it('includes cheat code in game_start', async () => {
       const ws = await wsConnect();
       await nextMessage(ws);
+      await setName(ws, 'Alice');
       send(ws, { type: 'create_lobby' });
       await waitForType(ws, 'lobby_created');
       send(ws, { type: 'player_ready' });
@@ -302,6 +326,7 @@ describe('Tetris2 Server', () => {
     it('activates cheat with correct sequence', async () => {
       const ws = await wsConnect();
       await nextMessage(ws);
+      await setName(ws, 'Alice');
       send(ws, { type: 'create_lobby' });
       await waitForType(ws, 'lobby_created');
       send(ws, { type: 'player_ready' });
@@ -317,6 +342,7 @@ describe('Tetris2 Server', () => {
     it('rejects cheat with incorrect sequence', async () => {
       const ws = await wsConnect();
       await nextMessage(ws);
+      await setName(ws, 'Alice');
       send(ws, { type: 'create_lobby' });
       await waitForType(ws, 'lobby_created');
       send(ws, { type: 'player_ready' });
@@ -395,6 +421,7 @@ describe('Tetris2 Server', () => {
     it('disabling cheats prevents activation', async () => {
       const ws = await wsConnect();
       await nextMessage(ws);
+      await setName(ws, 'Alice');
       // Disable cheats first
       send(ws, { type: 'save_settings', settings: { cheatEnabled: false } });
       await waitForType(ws, 'settings_saved');
@@ -418,6 +445,9 @@ describe('Tetris2 Server', () => {
       const ws2 = await wsConnect();
       await nextMessage(ws1);
       await nextMessage(ws2);
+
+      await setName(ws1, 'Alice');
+      await setName(ws2, 'Bob');
 
       send(ws1, { type: 'create_lobby', gameMode: 'obstacle' });
       const { code } = await waitForType(ws1, 'lobby_created');
