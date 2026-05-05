@@ -53,6 +53,12 @@
     } catch (_) { /* ignore playback errors */ }
   }
 
+  function stopBgm() {
+    if (!bgm) return;
+    bgm.pause();
+    try { bgm.currentTime = 0; } catch (_) {}
+  }
+
   function pauseBgm() {
     if (!bgm) return;
     bgm.pause();
@@ -199,9 +205,6 @@
         lines: game.lines,
       });
     },
-    onLock() {
-      playLockedSound();
-    },
     onGameOver({ score, lines, level }) {
       endGame(score, lines, level);
     },
@@ -307,19 +310,6 @@
         countdownText.textContent = count;
       } else if (count === 0) {
         countdownText.textContent = 'GO!';
-        if (gamestartSound) {
-          gamestartPlaying = true;
-          try {
-            gamestartSound.currentTime = 0;
-            const p = gamestartSound.play();
-            if (p && typeof p.catch === 'function') p.catch(() => proceedToStart());
-          } catch (_) {
-            proceedToStart();
-          }
-          gamestartSound.onended = proceedToStart;
-        } else {
-          // no start sound — fall back to the original next-tick start
-        }
       } else {
         clearInterval(_countdownTick);
         _countdownTick = null;

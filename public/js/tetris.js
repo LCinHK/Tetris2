@@ -102,7 +102,6 @@
       this.onLinesCleared = options.onLinesCleared || (() => {});
       this.onGameOver     = options.onGameOver     || (() => {});
       this.onBoardUpdate  = options.onBoardUpdate  || (() => {});
-      this.onLock         = options.onLock         || (() => {});
       this.onPieceMoved   = options.onPieceMoved   || (() => {});
 
       /* Canvases for next / hold */
@@ -208,7 +207,6 @@
           this.board[ny][p.x + c] = p.color;
         }
       }
-      this.onLock();
       this._clearLines();
       this.onBoardUpdate(this._serializeBoard());
       this._spawn();
