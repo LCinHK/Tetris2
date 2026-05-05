@@ -103,6 +103,7 @@
       this.onGameOver     = options.onGameOver     || (() => {});
       this.onBoardUpdate  = options.onBoardUpdate  || (() => {});
       this.onLock         = options.onLock         || (() => {});
+      this.onPieceMoved   = options.onPieceMoved   || (() => {});
 
       /* Canvases for next / hold */
       this.nextCanvas = options.nextCanvas || null;
@@ -118,6 +119,7 @@
       this.lines        = 0;
       this.isGameOver   = false;
       this.isPaused     = false;
+      this.isStarted    = false;
       this.holdPiece    = null;
       this.holdUsed     = false;
       this.scoreBoost   = false;
@@ -127,6 +129,7 @@
       this._rng         = SeededRandom(seed);
       this._bag         = [];
       this.currentPiece = null;
+      this.nextPiece    = null;
       this.ghostY       = 0;
       this._spawn();
     }
@@ -164,6 +167,12 @@
         cancelAnimationFrame(this._raf);
         this._draw();
         this.onGameOver({ score: this.score, lines: this.lines, level: this.level });
+        return;
+      }
+
+      // Notify opponent of newly spawned piece immediately (only once game is running)
+      if (this.isStarted) {
+        this.onPieceMoved(this._serializeBoardWithActivePiece());
       }
     }
 
@@ -227,25 +236,46 @@
     }
 
     /* ── Public controls ─────────────────────────────────────── */
-    moveLeft()  { if (this._fits(this.currentPiece, -1, 0)) { this.currentPiece.x--; this._updateGhost(); this._draw(); } }
-    moveRight() { if (this._fits(this.currentPiece,  1, 0)) { this.currentPiece.x++; this._updateGhost(); this._draw(); } }
+    moveLeft() {
+      if (!this.isStarted || this.isPaused || this.isGameOver) return;
+      if (this._fits(this.currentPiece, -1, 0)) {
+        this.currentPiece.x--;
+        this._updateGhost();
+        this._draw();
+        this.onPieceMoved(this._serializeBoardWithActivePiece());
+      }
+    }
+
+    moveRight() {
+      if (!this.isStarted || this.isPaused || this.isGameOver) return;
+      if (this._fits(this.currentPiece, 1, 0)) {
+        this.currentPiece.x++;
+        this._updateGhost();
+        this._draw();
+        this.onPieceMoved(this._serializeBoardWithActivePiece());
+      }
+    }
 
     softDrop() {
+      if (!this.isStarted || this.isPaused || this.isGameOver) return;
       if (this._fits(this.currentPiece, 0, 1)) {
         this.currentPiece.y++;
         this._lastDrop = performance.now();
         this._draw();
+        this.onPieceMoved(this._serializeBoardWithActivePiece());
       } else {
         this._lock();
       }
     }
 
     hardDrop() {
+      if (!this.isStarted || this.isPaused || this.isGameOver) return;
       while (this._fits(this.currentPiece, 0, 1)) this.currentPiece.y++;
       this._lock();
     }
 
     rotate() {
+      if (!this.isStarted || this.isPaused || this.isGameOver) return;
       const p   = this.currentPiece;
       const rot = rotateCW(p.shape);
       const newRot = (p.rot + 1) % 4;
@@ -261,6 +291,7 @@
             p.rot = newRot;
             this._updateGhost();
             this._draw();
+            this.onPieceMoved(this._serializeBoardWithActivePiece());
             return;
           }
         }
@@ -269,10 +300,12 @@
         p.rot = newRot;
         this._updateGhost();
         this._draw();
+        this.onPieceMoved(this._serializeBoardWithActivePiece());
       }
     }
 
     hold() {
+      if (!this.isStarted || this.isPaused || this.isGameOver) return;
       if (this.holdUsed) return;
       if (!this.holdPiece) {
         this.holdPiece = this._makePiece(this.currentPiece.key);
@@ -282,6 +315,7 @@
         this.holdPiece = this._makePiece(this.currentPiece.key);
         this.currentPiece = tmp;
         this._updateGhost();
+        this.onPieceMoved(this._serializeBoardWithActivePiece());
       }
       this.holdUsed = true;
       this._drawHold();
@@ -306,6 +340,7 @@
         this.board.push(row);
       }
       this._draw();
+      this.onPieceMoved(this._serializeBoardWithActivePiece());
     }
 
     /* Activate score-boost cheat */
@@ -317,6 +352,7 @@
     /* ── Game loop ─────────────────────────────────────────────── */
     start(seed) {
       if (seed !== undefined) this._reset(seed);
+      this.isStarted = true;
       this._lastDrop = performance.now();
       this._loop(performance.now());
     }
@@ -328,6 +364,7 @@
         if (this._fits(this.currentPiece, 0, 1)) {
           this.currentPiece.y++;
           this._updateGhost();
+          this.onPieceMoved(this._serializeBoardWithActivePiece());
         } else {
           this._lock();
           if (this.isGameOver) return;
@@ -434,6 +471,25 @@
     /* ── Serialisation for network sync ─────────────────────────── */
     _serializeBoard() {
       return this.board.map(row => row.map(c => c || 0));
+    }
+
+    /* Board snapshot including the active piece – used for real-time opponent sync */
+    _serializeBoardWithActivePiece() {
+      const snapshot = this.board.map(row => row.map(c => c || 0));
+      const p = this.currentPiece;
+      if (p) {
+        for (let r = 0; r < p.shape.length; r++) {
+          for (let c = 0; c < p.shape[r].length; c++) {
+            if (!p.shape[r][c]) continue;
+            const ny = p.y + r;
+            const nx = p.x + c;
+            if (ny >= 0 && ny < this.ROWS && nx >= 0 && nx < this.COLS) {
+              snapshot[ny][nx] = p.color;
+            }
+          }
+        }
+      }
+      return snapshot;
     }
   }
 

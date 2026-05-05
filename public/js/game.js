@@ -13,7 +13,6 @@
   try { settings = JSON.parse(localStorage.getItem('settings') || '{}'); } catch (_) {}
 
   const gameMode = gameConfig.gameMode || 'score_attack';
-  const seed     = gameConfig.seed     || Math.floor(Math.random() * 1e6);
   const isSolo   = !gameConfig.players || gameConfig.players.length < 2;
   const soundEnabled = settings.soundEnabled !== false;
   const bgmSound = soundEnabled ? new Audio('/audio/bgm.mp3') : null;
@@ -66,6 +65,24 @@
     } catch (_) { /* ignore playback errors */ }
   }
 
+  function _randomSeed() {
+    // Prefer cryptographically-strong randomness when available.
+    try {
+      if (window.crypto && window.crypto.getRandomValues) {
+        const buf = new Uint32Array(1);
+        window.crypto.getRandomValues(buf);
+        return buf[0] >>> 0;
+      }
+    } catch (_) {}
+    return Math.floor(Math.random() * 0xFFFFFFFF) >>> 0;
+  }
+
+  // Multiplayer should be deterministic (server-provided seed for fairness).
+  // Solo should feel fresh: generate a new seed each load so the initial piece varies.
+  const seed = isSolo
+    ? _randomSeed()
+    : (gameConfig.seed || _randomSeed());
+
   /* ── DOM refs ─────────────────────────────────────────────────── */
   const gameCanvas     = document.getElementById('gameCanvas');
   const opponentCanvas = document.getElementById('opponentCanvas');
@@ -104,10 +121,9 @@
   const TIME_ATTACK_DURATION = 3 * 60 * 1000; // 3 minutes
   let timerEnd = 0;
   let timerInterval = null;
+  let timerRemaining = 0; // ms remaining when paused
 
-  function startTimer() {
-    timerEnd = Date.now() + TIME_ATTACK_DURATION;
-    timerDisplay.classList.remove('hidden');
+  function _runTimerInterval() {
     timerInterval = setInterval(() => {
       const left = Math.max(0, timerEnd - Date.now());
       const m = Math.floor(left / 60000);
@@ -115,14 +131,27 @@
       timerDisplay.textContent = `${m}:${s.toString().padStart(2, '0')}`;
       if (left <= 0) {
         clearInterval(timerInterval);
+        timerInterval = null;
         endGame();
       }
     }, 250);
   }
 
+  function startTimer() {
+    clearInterval(timerInterval);
+    timerEnd = Date.now() + TIME_ATTACK_DURATION;
+    timerDisplay.classList.remove('hidden');
+    _runTimerInterval();
+  }
+
   /* ── Create game instance ────────────────────────────────────── */
+  let _lastPieceMoveSend = 0;
+  let _opponentGameOver  = false;
+  let _gameEnded         = false;
+
   const game = new TetrisGame(gameCanvas, {
     cellSize: 30,
+    seed,
     nextCanvas,
     holdCanvas,
     onScoreUpdate({ score, lines, level }) {
@@ -135,6 +164,20 @@
       Network.send({ type: 'lines_cleared', count, score });
     },
     onBoardUpdate(board) {
+      // Always send after a piece locks (board state finalised)
+      Network.send({
+        type: 'game_update',
+        board,
+        score: game.score,
+        level: game.level,
+        lines: game.lines,
+      });
+    },
+    onPieceMoved(board) {
+      // Throttle to ~20 fps to avoid flooding the network
+      const now = Date.now();
+      if (now - _lastPieceMoveSend < 50) return;
+      _lastPieceMoveSend = now;
       Network.send({
         type: 'game_update',
         board,
@@ -169,9 +212,27 @@
 
   /* ── Keyboard controls ───────────────────────────────────────── */
   let hardDropLocked = false;
+  let gameStarted = false;
 
   document.addEventListener('keydown', (e) => {
     if (game.isGameOver) return;
+
+    // During countdown (before start), ignore all gameplay inputs.
+    if (!gameStarted) {
+      if (['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', ' ', 'c', 'C', 'p', 'P'].includes(e.key)) {
+        e.preventDefault();
+      }
+      return;
+    }
+
+    // While paused, only allow unpausing.
+    if (game.isPaused && !(e.key === 'p' || e.key === 'P')) {
+      // Prevent browser scrolling on arrow keys/space.
+      if (['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', ' '].includes(e.key)) {
+        e.preventDefault();
+      }
+      return;
+    }
     switch (e.key) {
       case 'ArrowLeft':  e.preventDefault(); game.moveLeft();  break;
       case 'ArrowRight': e.preventDefault(); game.moveRight(); break;
@@ -198,27 +259,47 @@
     if (pauseOverlay) {
       paused ? pauseOverlay.classList.remove('hidden') : pauseOverlay.classList.add('hidden');
     }
+    // Pause / resume the Time Attack countdown so time doesn't drain while paused
+    if (gameMode === 'time_attack') {
+      if (paused) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        timerRemaining = Math.max(0, timerEnd - Date.now());
+      } else if (timerRemaining > 0) {
+        timerEnd = Date.now() + timerRemaining;
+        _runTimerInterval();
+      }
+    }
   }
 
   /* ── Countdown then start ────────────────────────────────────── */
+  let _booted = false;
+  let _bootFallbackTimer = null;
+  let _countdownTick = null;
+
   function startWithCountdown() {
+    if (_countdownTick) {
+      clearInterval(_countdownTick);
+      _countdownTick = null;
+    }
+
     countdownOverlay.classList.remove('hidden');
     let count = 3;
     countdownText.textContent = count;
 
-    let tick = null;
     let gamestartPlaying = false;
 
     function proceedToStart() {
-      if (tick) { clearInterval(tick); tick = null; }
+      if (_countdownTick) { clearInterval(_countdownTick); _countdownTick = null; }
       countdownOverlay.classList.add('hidden');
+      gameStarted = true;
       playBgm();
       game.start(seed);
       if (gameMode === 'time_attack') startTimer();
       gamestartPlaying = false;
     }
 
-    tick = setInterval(() => {
+    _countdownTick = setInterval(() => {
       count--;
       if (count > 0) {
         countdownText.textContent = count;
@@ -245,13 +326,29 @@
 
   /* ── End game ────────────────────────────────────────────────── */
   function endGame(score, lines, level) {
+    if (_gameEnded) return;
+    _gameEnded = true;
+
     clearInterval(timerInterval);
+    timerInterval = null;
     stopBgm();
     cheat.detach();
 
     const finalScore = score  !== undefined ? score  : game.score;
     const finalLines = lines  !== undefined ? lines  : game.lines;
     const finalLevel = level  !== undefined ? level  : game.level;
+
+    // Determine match outcome for the game-over page
+    let result;
+    if (isSolo) {
+      result = gameMode === 'time_attack' ? 'time_up' : 'solo';
+    } else if (_opponentGameOver) {
+      result = 'win';
+    } else if (gameMode === 'time_attack') {
+      result = 'time_up';
+    } else {
+      result = 'loss';
+    }
 
     Network.send({
       type: 'game_over',
@@ -266,6 +363,7 @@
       linesCleared: finalLines,
       level: finalLevel,
       gameMode,
+      result,
     }));
 
     // Wait for server to confirm with full stats, then navigate
@@ -286,10 +384,13 @@
     if (opponentArea && !opponentArea.classList.contains('hidden')) {
       if (msg.board) drawOpponentBoard(opponentCanvas, msg.board);
       if (opponentScore) opponentScore.textContent = (msg.score || 0).toLocaleString();
+      _setText('opponentLevel', msg.level || 1);
+      _setText('opponentLines', msg.lines || 0);
     }
   });
 
   Network.on('opponent_game_over', (msg) => {
+    _opponentGameOver = true;
     const overlay = document.getElementById('opponentOverlay');
     if (overlay) overlay.classList.remove('hidden');
     notify(`Opponent finished with ${(msg.score || 0).toLocaleString()} pts! You win!`, 'success');
@@ -355,6 +456,12 @@
   /* ── Boot ─────────────────────────────────────────────────────── */
   // If network already open, start immediately; otherwise wait
   function boot() {
+    if (_booted) return;
+    _booted = true;
+    if (_bootFallbackTimer) {
+      clearTimeout(_bootFallbackTimer);
+      _bootFallbackTimer = null;
+    }
     startWithCountdown();
   }
 
@@ -363,7 +470,7 @@
   } else {
     Network.on('open', boot);
     // Fallback: if WS takes too long, still start the game
-    setTimeout(() => {
+    _bootFallbackTimer = setTimeout(() => {
       if (!game._raf && !game.isGameOver) boot();
     }, 2000);
   }
