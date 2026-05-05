@@ -83,6 +83,76 @@
     ? _randomSeed()
     : (gameConfig.seed || _randomSeed());
 
+  const soundEnabled = settings.soundEnabled !== false;
+
+  /* ── Load audio ───────────────────────────────────────────────── */
+  let bgmVolume = 0.8;
+  let sfxVolume = 1;
+
+  const bgm = soundEnabled ? new Audio('/audio/bgm.mp3') : null;
+  if (bgm) { bgm.volume = bgmVolume; bgm.loop = true; }
+
+  const clearSound = soundEnabled ? new Audio('/audio/clear.mp3') : null;
+  const lockSound = soundEnabled ? new Audio('/audio/lock.mp3') : null;
+  const countdownSound = soundEnabled ? new Audio('/audio/countdown.mp3') : null;
+  const gamestartSound = soundEnabled ? new Audio('/audio/gamestart.mp3') : null;
+  //const gameoverSound = soundEnabled ? new Audio('/audio/gameover.mp3') : null;
+  if (clearSound) clearSound.volume = sfxVolume;
+  if (lockSound) lockSound.volume = sfxVolume;
+  if (countdownSound) countdownSound.volume = sfxVolume;
+  if (gamestartSound) gamestartSound.volume = sfxVolume;
+  //if (gameoverSound) gameoverSound.volume = sfxVolume;
+
+  function playBgm() {
+    if (!bgm) return;
+    try {
+      bgm.currentTime = 0;
+      void bgm.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
+
+  function pauseBgm() {
+    if (!bgm) return;
+    bgm.pause();
+  }
+
+  function resumeBgm() {
+    if (!bgm) return;
+    void bgm.play().catch(() => {});
+  }
+
+  function playClearSound() {
+    if (!clearSound) return;
+    try {
+      clearSound.currentTime = 0;
+      void clearSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
+
+  function playLockSound() {
+    if (!lockSound) return;
+    try {
+      lockSound.currentTime = 0;
+      void lockSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
+
+  function playCountdownSound() {
+    if (!countdownSound) return;
+    try {
+      countdownSound.currentTime = 0;
+      void countdownSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
+
+  function playGamestartSound() {
+    if (!gamestartSound) return;
+    try {
+      gamestartSound.currentTime = 0;
+      void gamestartSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
+
   /* ── DOM refs ─────────────────────────────────────────────────── */
   const gameCanvas     = document.getElementById('gameCanvas');
   const opponentCanvas = document.getElementById('opponentCanvas');
@@ -160,11 +230,12 @@
       _setText('linesDisplay', lines);
     },
     onLinesCleared({ count, score }) {
-      if (count > 0) playClearSound();
+      playClearSound();
       Network.send({ type: 'lines_cleared', count, score });
     },
     onBoardUpdate(board) {
       // Always send after a piece locks (board state finalised)
+      playLockSound();
       Network.send({
         type: 'game_update',
         board,
@@ -254,8 +325,7 @@
   function togglePause() {
     if (game.isGameOver) return;
     const paused = game.togglePause();
-    if (paused) pauseBgm();
-    else resumeBgm();
+    paused ? pauseBgm() : resumeBgm();
     if (pauseOverlay) {
       paused ? pauseOverlay.classList.remove('hidden') : pauseOverlay.classList.add('hidden');
     }
@@ -287,17 +357,7 @@
     let count = 3;
     countdownText.textContent = count;
 
-    let gamestartPlaying = false;
-
-    function proceedToStart() {
-      if (_countdownTick) { clearInterval(_countdownTick); _countdownTick = null; }
-      countdownOverlay.classList.add('hidden');
-      gameStarted = true;
-      playBgm();
-      game.start(seed);
-      if (gameMode === 'time_attack') startTimer();
-      gamestartPlaying = false;
-    }
+    playCountdownSound();
 
     _countdownTick = setInterval(() => {
       count--;
@@ -319,7 +379,14 @@
           // no start sound — fall back to the original next-tick start
         }
       } else {
-        if (!gamestartPlaying) proceedToStart();
+        clearInterval(_countdownTick);
+        _countdownTick = null;
+        countdownOverlay.classList.add('hidden');
+        gameStarted = true;
+        game.start(seed);
+        if (gameMode === 'time_attack') startTimer();
+        playGamestartSound();
+        if (gamestartSound) { gamestartSound.addEventListener('ended', playBgm); }
       }
     }, 900);
   }
@@ -367,10 +434,7 @@
     }));
 
     // Wait for server to confirm with full stats, then navigate
-    const nav = () => {
-      try { sessionStorage.setItem('playGameOver', '1'); } catch (_) {}
-      window.location.href = '/gameover.html';
-    };
+    const nav = () => { window.location.href = '/gameover.html'; sessionStorage.setItem('playGameOver', 'true'); };
     Network.on('game_over_confirmed', (msg) => {
       if (msg.stats) localStorage.setItem('stats', JSON.stringify(msg.stats));
       nav();
