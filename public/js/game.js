@@ -15,6 +15,16 @@
   const gameMode = gameConfig.gameMode || 'score_attack';
   const seed     = gameConfig.seed     || Math.floor(Math.random() * 1e6);
   const isSolo   = !gameConfig.players || gameConfig.players.length < 2;
+  const soundEnabled = settings.soundEnabled !== false;
+  const lockedSound = soundEnabled ? new Audio('/audio/locked.mp3') : null;
+
+  function playLockedSound() {
+    if (!lockedSound) return;
+    try {
+      lockedSound.currentTime = 0;
+      void lockedSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
 
   /* ── DOM refs ─────────────────────────────────────────────────── */
   const gameCanvas     = document.getElementById('gameCanvas');
@@ -91,6 +101,9 @@
         level: game.level,
         lines: game.lines,
       });
+    },
+    onLock() {
+      playLockedSound();
     },
     onGameOver({ score, lines, level }) {
       endGame(score, lines, level);
