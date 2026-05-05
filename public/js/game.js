@@ -320,7 +320,7 @@
         playGamestartSound();
         if (gamestartSound) { gamestartSound.addEventListener('ended', playBgm); }
       }
-    }, 900);
+    }, 1000);
   }
 
   /* ── End game ────────────────────────────────────────────────── */
