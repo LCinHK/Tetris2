@@ -128,6 +128,7 @@
       this._rng         = SeededRandom(seed);
       this._bag         = [];
       this.currentPiece = null;
+      this.nextPiece    = null;
       this.ghostY       = 0;
       this._spawn();
     }
@@ -168,8 +169,10 @@
         return;
       }
 
-      // Notify opponent of newly spawned piece immediately
-      this.onPieceMoved(this._serializeBoardWithActivePiece());
+      // Notify opponent of newly spawned piece immediately (only once game is running)
+      if (this.isStarted) {
+        this.onPieceMoved(this._serializeBoardWithActivePiece());
+      }
     }
 
     /* ── Collision / fit check ─────────────────────────────────── */
