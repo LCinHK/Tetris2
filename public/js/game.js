@@ -16,7 +16,46 @@
   const seed     = gameConfig.seed     || Math.floor(Math.random() * 1e6);
   const isSolo   = !gameConfig.players || gameConfig.players.length < 2;
   const soundEnabled = settings.soundEnabled !== false;
+  const bgmSound = soundEnabled ? new Audio('/audio/bgm.mp3') : null;
+  const clearSound = soundEnabled ? new Audio('/audio/clear.mp3') : null;
   const lockedSound = soundEnabled ? new Audio('/audio/locked.mp3') : null;
+
+  if (bgmSound) {
+    bgmSound.loop = true;
+    bgmSound.volume = 0.35;
+  }
+
+  function playBgm() {
+    if (!bgmSound) return;
+    try {
+      bgmSound.currentTime = 0;
+      void bgmSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
+
+  function stopBgm() {
+    if (!bgmSound) return;
+    bgmSound.pause();
+    bgmSound.currentTime = 0;
+  }
+
+  function pauseBgm() {
+    if (!bgmSound) return;
+    bgmSound.pause();
+  }
+
+  function resumeBgm() {
+    if (!bgmSound) return;
+    void bgmSound.play().catch(() => {});
+  }
+
+  function playClearSound() {
+    if (!clearSound) return;
+    try {
+      clearSound.currentTime = 0;
+      void clearSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
 
   function playLockedSound() {
     if (!lockedSound) return;
@@ -91,6 +130,7 @@
       _setText('linesDisplay', lines);
     },
     onLinesCleared({ count, score }) {
+      if (count > 0) playClearSound();
       Network.send({ type: 'lines_cleared', count, score });
     },
     onBoardUpdate(board) {
@@ -152,6 +192,8 @@
   function togglePause() {
     if (game.isGameOver) return;
     const paused = game.togglePause();
+    if (paused) pauseBgm();
+    else resumeBgm();
     if (pauseOverlay) {
       paused ? pauseOverlay.classList.remove('hidden') : pauseOverlay.classList.add('hidden');
     }
@@ -172,6 +214,7 @@
       } else {
         clearInterval(tick);
         countdownOverlay.classList.add('hidden');
+        playBgm();
         game.start(seed);
         if (gameMode === 'time_attack') startTimer();
       }
@@ -181,6 +224,7 @@
   /* ── End game ────────────────────────────────────────────────── */
   function endGame(score, lines, level) {
     clearInterval(timerInterval);
+    stopBgm();
     cheat.detach();
 
     const finalScore = score  !== undefined ? score  : game.score;
@@ -203,7 +247,10 @@
     }));
 
     // Wait for server to confirm with full stats, then navigate
-    const nav = () => { window.location.href = '/gameover.html'; };
+    const nav = () => {
+      try { sessionStorage.setItem('playGameOver', '1'); } catch (_) {}
+      window.location.href = '/gameover.html';
+    };
     Network.on('game_over_confirmed', (msg) => {
       if (msg.stats) localStorage.setItem('stats', JSON.stringify(msg.stats));
       nav();
