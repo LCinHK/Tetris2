@@ -8,8 +8,21 @@
   /* ── Load data ───────────────────────────────────────────────── */
   let lastGame = {};
   let stats    = {};
+  let settings = {};
   try { lastGame = JSON.parse(localStorage.getItem('lastGame') || '{}'); } catch (_) {}
   try { stats    = JSON.parse(localStorage.getItem('stats')    || '{}'); } catch (_) {}
+  try { settings = JSON.parse(localStorage.getItem('settings')  || '{}'); } catch (_) {}
+
+  const soundEnabled = settings.soundEnabled !== false;
+
+  function playGameOverSound() {
+    if (!soundEnabled) return;
+    try {
+      const gameOverSound = new Audio('/audio/gameover.mp3');
+      gameOverSound.currentTime = 0;
+      void gameOverSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
 
   /* ── Mode labels ─────────────────────────────────────────────── */
   const modeLabels = {
@@ -52,6 +65,11 @@
   _setText('finalLevel', lastGame.level || 1);
   _setText('finalMode',  modeLabels[lastGame.gameMode] || (lastGame.gameMode || '–'));
   _setText('allTimeHigh', (stats.highScore || 0).toLocaleString());
+
+  if (lastGame && Object.keys(lastGame).length > 0 && sessionStorage.getItem('playGameOver') === '1') {
+    playGameOverSound();
+    try { sessionStorage.removeItem('playGameOver'); } catch (_) {}
+  }
 
   /* ── Score history table ─────────────────────────────────────── */
   const historyBody = document.getElementById('historyBody');

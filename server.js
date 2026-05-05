@@ -83,6 +83,7 @@ const MIME = {
   '.json': 'application/json',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+  '.mp3': 'audio/mpeg',
 };
 
 const server = http.createServer((req, res) => {
