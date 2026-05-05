@@ -66,14 +66,6 @@
     } catch (_) { /* ignore playback errors */ }
   }
 
-  function playGameStartSound() {
-    if (!gamestartSound) return;
-    try {
-      gamestartSound.currentTime = 0;
-      void gamestartSound.play().catch(() => {});
-    } catch (_) { /* ignore playback errors */ }
-  }
-
   /* ── DOM refs ─────────────────────────────────────────────────── */
   const gameCanvas     = document.getElementById('gameCanvas');
   const opponentCanvas = document.getElementById('opponentCanvas');

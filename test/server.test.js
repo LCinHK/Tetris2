@@ -136,6 +136,15 @@ describe('Tetris2 Server', () => {
       });
     });
 
+    it('serves .mp3 files with audio/mpeg content-type', (_, done) => {
+      http.get(`${BASE_URL}/audio/bgm.mp3`, (res) => {
+        assert.equal(res.statusCode, 200);
+        assert.ok(res.headers['content-type'].includes('audio/mpeg'));
+        res.resume();
+        done();
+      });
+    });
+
     it('blocks path traversal attempts with 403', (_, done) => {
       http.get(`${BASE_URL}/..%2F..%2Fetc%2Fpasswd`, (res) => {
         assert.ok([403, 404].includes(res.statusCode), `expected 403 or 404, got ${res.statusCode}`);

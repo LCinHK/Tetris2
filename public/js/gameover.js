@@ -14,11 +14,11 @@
   try { settings = JSON.parse(localStorage.getItem('settings')  || '{}'); } catch (_) {}
 
   const soundEnabled = settings.soundEnabled !== false;
-  const gameOverSound = soundEnabled ? new Audio('/audio/gameover.mp3') : null;
 
   function playGameOverSound() {
-    if (!gameOverSound) return;
+    if (!soundEnabled) return;
     try {
+      const gameOverSound = new Audio('/audio/gameover.mp3');
       gameOverSound.currentTime = 0;
       void gameOverSound.play().catch(() => {});
     } catch (_) { /* ignore playback errors */ }
