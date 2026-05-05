@@ -8,8 +8,23 @@
   /* ── Load data ───────────────────────────────────────────────── */
   let lastGame = {};
   let stats    = {};
+  let settings = {};
   try { lastGame = JSON.parse(localStorage.getItem('lastGame') || '{}'); } catch (_) {}
   try { stats    = JSON.parse(localStorage.getItem('stats')    || '{}'); } catch (_) {}
+  try { settings = JSON.parse(localStorage.getItem('settings') || '{}'); } catch (_) {}
+
+  // One-time trigger from previous page: play gameover sound when requested.
+  const soundEnabled = settings.soundEnabled !== false;
+  if (sessionStorage.getItem('playGameOver') === 'true') {
+    sessionStorage.removeItem('playGameOver');
+    if (soundEnabled) {
+      try {
+        const gameOverSound = new Audio('/audio/gameover.mp3');
+        gameOverSound.currentTime = 0;
+        void gameOverSound.play().catch(() => {});
+      } catch (_) { /* ignore playback errors */ }
+    }
+  }
 
   /* ── Mode labels ─────────────────────────────────────────────── */
   const modeLabels = {

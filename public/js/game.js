@@ -33,6 +33,8 @@
     ? _randomSeed()
     : (gameConfig.seed || _randomSeed());
 
+  const soundEnabled = settings.soundEnabled !== false;
+
   /* ── Load audio ───────────────────────────────────────────────── */
   let bgmVolume = 0.8;
   let sfxVolume = 1;
@@ -44,10 +46,12 @@
   const lockSound = soundEnabled ? new Audio('/audio/lock.mp3') : null;
   const countdownSound = soundEnabled ? new Audio('/audio/countdown.mp3') : null;
   const gamestartSound = soundEnabled ? new Audio('/audio/gamestart.mp3') : null;
+  //const gameoverSound = soundEnabled ? new Audio('/audio/gameover.mp3') : null;
   if (clearSound) clearSound.volume = sfxVolume;
   if (lockSound) lockSound.volume = sfxVolume;
   if (countdownSound) countdownSound.volume = sfxVolume;
   if (gamestartSound) gamestartSound.volume = sfxVolume;
+  //if (gameoverSound) gameoverSound.volume = sfxVolume;
 
   function playBgm() {
     if (!bgm) return;
@@ -55,12 +59,6 @@
       bgm.currentTime = 0;
       void bgm.play().catch(() => {});
     } catch (_) { /* ignore playback errors */ }
-  }
-
-  function stopBgm() {
-    if (!bgm) return;
-    bgm.pause();
-    bgm.currentTime = 0;
   }
 
   function pauseBgm() {
@@ -182,10 +180,12 @@
       _setText('linesDisplay', lines);
     },
     onLinesCleared({ count, score }) {
+      playClearSound();
       Network.send({ type: 'lines_cleared', count, score });
     },
     onBoardUpdate(board) {
       // Always send after a piece locks (board state finalised)
+      playLockedSound();
       Network.send({
         type: 'game_update',
         board,
@@ -330,8 +330,6 @@
     if (_gameEnded) return;
     _gameEnded = true;
 
-    stopBgm();
-
     clearInterval(timerInterval);
     timerInterval = null;
     cheat.detach();
@@ -369,7 +367,7 @@
     }));
 
     // Wait for server to confirm with full stats, then navigate
-    const nav = () => { window.location.href = '/gameover.html'; };
+    const nav = () => { window.location.href = '/gameover.html'; sessionStorage.setItem('playGameOver', 'true'); };
     Network.on('game_over_confirmed', (msg) => {
       if (msg.stats) localStorage.setItem('stats', JSON.stringify(msg.stats));
       nav();
