@@ -24,6 +24,7 @@
         void gameOverSound.play().catch(() => {});
       } catch (_) { /* ignore playback errors */ }
     }
+  }
 
   /* ── Mode labels ─────────────────────────────────────────────── */
   const modeLabels = {
