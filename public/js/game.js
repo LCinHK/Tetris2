@@ -366,7 +366,10 @@
     }));
 
     // Wait for server to confirm with full stats, then navigate
-    const nav = () => { window.location.href = '/gameover.html'; sessionStorage.setItem('playGameOver', 'true'); };
+    const nav = () => {
+      sessionStorage.setItem('playGameOver', 'true');
+      window.location.href = '/gameover.html';
+    };
     Network.on('game_over_confirmed', (msg) => {
       if (msg.stats) localStorage.setItem('stats', JSON.stringify(msg.stats));
       nav();
