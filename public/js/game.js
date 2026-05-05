@@ -33,6 +33,78 @@
     ? _randomSeed()
     : (gameConfig.seed || _randomSeed());
 
+  /* ── Load audio ───────────────────────────────────────────────── */
+  let bgmVolume = 0.8;
+  let sfxVolume = 1;
+
+  const bgm = soundEnabled ? new Audio('/audio/bgm.mp3') : null;
+  if (bgm) { bgm.volume = bgmVolume; bgm.loop = true; }
+
+  const clearSound = soundEnabled ? new Audio('/audio/clear.mp3') : null;
+  const lockSound = soundEnabled ? new Audio('/audio/lock.mp3') : null;
+  const countdownSound = soundEnabled ? new Audio('/audio/countdown.mp3') : null;
+  const gamestartSound = soundEnabled ? new Audio('/audio/gamestart.mp3') : null;
+  if (clearSound) clearSound.volume = sfxVolume;
+  if (lockSound) lockSound.volume = sfxVolume;
+  if (countdownSound) countdownSound.volume = sfxVolume;
+  if (gamestartSound) gamestartSound.volume = sfxVolume;
+
+  function playBgm() {
+    if (!bgm) return;
+    try {
+      bgm.currentTime = 0;
+      void bgm.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
+
+  function stopBgm() {
+    if (!bgm) return;
+    bgm.pause();
+    bgm.currentTime = 0;
+  }
+
+  function pauseBgm() {
+    if (!bgm) return;
+    bgm.pause();
+  }
+
+  function resumeBgm() {
+    if (!bgm) return;
+    void bgm.play().catch(() => {});
+  }
+
+  function playClearSound() {
+    if (!clearSound) return;
+    try {
+      clearSound.currentTime = 0;
+      void clearSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
+
+  function playLockedSound() {
+    if (!lockSound) return;
+    try {
+      lockSound.currentTime = 0;
+      void lockSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
+
+  function playCountdownSound() {
+    if (!countdownSound) return;
+    try {
+      countdownSound.currentTime = 0;
+      void countdownSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
+
+  function playGamestartSound() {
+    if (!gamestartSound) return;
+    try {
+      gamestartSound.currentTime = 0;
+      void gamestartSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
+
   /* ── DOM refs ─────────────────────────────────────────────────── */
   const gameCanvas     = document.getElementById('gameCanvas');
   const opponentCanvas = document.getElementById('opponentCanvas');
@@ -231,6 +303,8 @@
     let count = 3;
     countdownText.textContent = count;
 
+    playCountdownSound();
+
     _countdownTick = setInterval(() => {
       count--;
       if (count > 0) {
@@ -244,6 +318,8 @@
         gameStarted = true;
         game.start(seed);
         if (gameMode === 'time_attack') startTimer();
+        playGamestartSound();
+        if (gamestartSound) { gamestartSound.addEventListener('ended', playBgm); }
       }
     }, 900);
   }
