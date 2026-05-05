@@ -19,6 +19,7 @@
   const bgmSound = soundEnabled ? new Audio('/audio/bgm.mp3') : null;
   const clearSound = soundEnabled ? new Audio('/audio/clear.mp3') : null;
   const lockedSound = soundEnabled ? new Audio('/audio/locked.mp3') : null;
+  const gamestartSound = soundEnabled ? new Audio('/audio/gamestart.mp3') : null;
 
   if (bgmSound) {
     bgmSound.loop = true;
@@ -62,6 +63,14 @@
     try {
       lockedSound.currentTime = 0;
       void lockedSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
+
+  function playGameStartSound() {
+    if (!gamestartSound) return;
+    try {
+      gamestartSound.currentTime = 0;
+      void gamestartSound.play().catch(() => {});
     } catch (_) { /* ignore playback errors */ }
   }
 
@@ -211,6 +220,7 @@
         countdownText.textContent = count;
       } else if (count === 0) {
         countdownText.textContent = 'GO!';
+        playGameStartSound();
       } else {
         clearInterval(tick);
         countdownOverlay.classList.add('hidden');
