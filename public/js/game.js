@@ -14,6 +14,56 @@
 
   const gameMode = gameConfig.gameMode || 'score_attack';
   const isSolo   = !gameConfig.players || gameConfig.players.length < 2;
+  const soundEnabled = settings.soundEnabled !== false;
+  const bgmSound = soundEnabled ? new Audio('/audio/bgm.mp3') : null;
+  const clearSound = soundEnabled ? new Audio('/audio/clear.mp3') : null;
+  const lockedSound = soundEnabled ? new Audio('/audio/locked.mp3') : null;
+  const gamestartSound = soundEnabled ? new Audio('/audio/gamestart.mp3') : null;
+
+  if (bgmSound) {
+    bgmSound.loop = true;
+    bgmSound.volume = 0.35;
+  }
+
+  function playBgm() {
+    if (!bgmSound) return;
+    try {
+      bgmSound.currentTime = 0;
+      void bgmSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
+
+  function stopBgm() {
+    if (!bgmSound) return;
+    bgmSound.pause();
+    bgmSound.currentTime = 0;
+  }
+
+  function pauseBgm() {
+    if (!bgmSound) return;
+    bgmSound.pause();
+  }
+
+  function resumeBgm() {
+    if (!bgmSound) return;
+    void bgmSound.play().catch(() => {});
+  }
+
+  function playClearSound() {
+    if (!clearSound) return;
+    try {
+      clearSound.currentTime = 0;
+      void clearSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
+
+  function playLockedSound() {
+    if (!lockedSound) return;
+    try {
+      lockedSound.currentTime = 0;
+      void lockedSound.play().catch(() => {});
+    } catch (_) { /* ignore playback errors */ }
+  }
 
   function _randomSeed() {
     // Prefer cryptographically-strong randomness when available.
@@ -79,7 +129,7 @@
     } catch (_) { /* ignore playback errors */ }
   }
 
-  function playLockedSound() {
+  function playLockSound() {
     if (!lockSound) return;
     try {
       lockSound.currentTime = 0;
@@ -185,7 +235,7 @@
     },
     onBoardUpdate(board) {
       // Always send after a piece locks (board state finalised)
-      playLockedSound();
+      playLockSound();
       Network.send({
         type: 'game_update',
         board,
@@ -206,6 +256,9 @@
         level: game.level,
         lines: game.lines,
       });
+    },
+    onLock() {
+      playLockedSound();
     },
     onGameOver({ score, lines, level }) {
       endGame(score, lines, level);
@@ -312,6 +365,19 @@
         countdownText.textContent = count;
       } else if (count === 0) {
         countdownText.textContent = 'GO!';
+        if (gamestartSound) {
+          gamestartPlaying = true;
+          try {
+            gamestartSound.currentTime = 0;
+            const p = gamestartSound.play();
+            if (p && typeof p.catch === 'function') p.catch(() => proceedToStart());
+          } catch (_) {
+            proceedToStart();
+          }
+          gamestartSound.onended = proceedToStart;
+        } else {
+          // no start sound — fall back to the original next-tick start
+        }
       } else {
         clearInterval(_countdownTick);
         _countdownTick = null;
@@ -332,6 +398,7 @@
 
     clearInterval(timerInterval);
     timerInterval = null;
+    stopBgm();
     cheat.detach();
 
     const finalScore = score  !== undefined ? score  : game.score;
