@@ -22,17 +22,28 @@
   const title    = document.getElementById('goTitle');
   const subtitle = document.getElementById('goSubtitle');
 
-  // If the player won (server sets stats.wins), show winner message
-  // We detect a "win" if this score equals the most recent win entry
-  // Simple heuristic: if this score is non-zero, just show "Game Over"
-  if (title) title.textContent = 'GAME OVER';
+  const result = lastGame.result;
+  const lines  = lastGame.linesCleared || 0;
+
+  if (title) {
+    if      (result === 'win')     title.textContent = '🏆 YOU WIN!';
+    else if (result === 'loss')    title.textContent = '💀 GAME OVER';
+    else if (result === 'time_up') title.textContent = "⏰ TIME'S UP!";
+    else                           title.textContent = 'GAME OVER';
+  }
+
   if (subtitle) {
-    const lines = lastGame.linesCleared || 0;
-    subtitle.textContent = lines >= 30
-      ? '🏆 Impressive performance!'
-      : lines >= 15
-        ? '👍 Not bad – keep practicing!'
-        : '💪 Better luck next time!';
+    if (result === 'win') {
+      subtitle.textContent = 'Excellent! Your opponent ran out of moves.';
+    } else if (result === 'loss') {
+      subtitle.textContent = 'Hang in there — better luck next time!';
+    } else {
+      subtitle.textContent = lines >= 30
+        ? '🏆 Impressive performance!'
+        : lines >= 15
+          ? '👍 Not bad – keep practicing!'
+          : '💪 Better luck next time!';
+    }
   }
 
   /* ── Score card ──────────────────────────────────────────────── */
@@ -72,17 +83,8 @@
 
   /* ── Buttons ─────────────────────────────────────────────────── */
   document.getElementById('playAgainBtn').addEventListener('click', () => {
-    // Re-use the same lobby config if possible; otherwise go home to create new
-    const currentGame = localStorage.getItem('currentGame');
-    if (currentGame) {
-      try {
-        const cfg = JSON.parse(currentGame);
-        // Update seed for new game
-        cfg.seed = Math.floor(Math.random() * 1e6);
-        localStorage.setItem('currentGame', JSON.stringify(cfg));
-      } catch (_) {}
-    }
-    // Navigate back to home to let the player set up again
+    // Clear stale game config so the home page starts fresh
+    localStorage.removeItem('currentGame');
     window.location.href = '/';
   });
 

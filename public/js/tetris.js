@@ -102,6 +102,7 @@
       this.onLinesCleared = options.onLinesCleared || (() => {});
       this.onGameOver     = options.onGameOver     || (() => {});
       this.onBoardUpdate  = options.onBoardUpdate  || (() => {});
+      this.onPieceMoved   = options.onPieceMoved   || (() => {});
 
       /* Canvases for next / hold */
       this.nextCanvas = options.nextCanvas || null;
@@ -163,7 +164,11 @@
         cancelAnimationFrame(this._raf);
         this._draw();
         this.onGameOver({ score: this.score, lines: this.lines, level: this.level });
+        return;
       }
+
+      // Notify opponent of newly spawned piece immediately
+      this.onPieceMoved(this._serializeBoardWithActivePiece());
     }
 
     /* ── Collision / fit check ─────────────────────────────────── */
@@ -225,14 +230,30 @@
     }
 
     /* ── Public controls ─────────────────────────────────────── */
-    moveLeft()  { if (this._fits(this.currentPiece, -1, 0)) { this.currentPiece.x--; this._updateGhost(); this._draw(); } }
-    moveRight() { if (this._fits(this.currentPiece,  1, 0)) { this.currentPiece.x++; this._updateGhost(); this._draw(); } }
+    moveLeft() {
+      if (this._fits(this.currentPiece, -1, 0)) {
+        this.currentPiece.x--;
+        this._updateGhost();
+        this._draw();
+        this.onPieceMoved(this._serializeBoardWithActivePiece());
+      }
+    }
+
+    moveRight() {
+      if (this._fits(this.currentPiece, 1, 0)) {
+        this.currentPiece.x++;
+        this._updateGhost();
+        this._draw();
+        this.onPieceMoved(this._serializeBoardWithActivePiece());
+      }
+    }
 
     softDrop() {
       if (this._fits(this.currentPiece, 0, 1)) {
         this.currentPiece.y++;
         this._lastDrop = performance.now();
         this._draw();
+        this.onPieceMoved(this._serializeBoardWithActivePiece());
       } else {
         this._lock();
       }
@@ -259,6 +280,7 @@
             p.rot = newRot;
             this._updateGhost();
             this._draw();
+            this.onPieceMoved(this._serializeBoardWithActivePiece());
             return;
           }
         }
@@ -267,6 +289,7 @@
         p.rot = newRot;
         this._updateGhost();
         this._draw();
+        this.onPieceMoved(this._serializeBoardWithActivePiece());
       }
     }
 
@@ -280,6 +303,7 @@
         this.holdPiece = this._makePiece(this.currentPiece.key);
         this.currentPiece = tmp;
         this._updateGhost();
+        this.onPieceMoved(this._serializeBoardWithActivePiece());
       }
       this.holdUsed = true;
       this._drawHold();
@@ -304,6 +328,7 @@
         this.board.push(row);
       }
       this._draw();
+      this.onPieceMoved(this._serializeBoardWithActivePiece());
     }
 
     /* Activate score-boost cheat */
@@ -326,6 +351,7 @@
         if (this._fits(this.currentPiece, 0, 1)) {
           this.currentPiece.y++;
           this._updateGhost();
+          this.onPieceMoved(this._serializeBoardWithActivePiece());
         } else {
           this._lock();
           if (this.isGameOver) return;
@@ -432,6 +458,25 @@
     /* ── Serialisation for network sync ─────────────────────────── */
     _serializeBoard() {
       return this.board.map(row => row.map(c => c || 0));
+    }
+
+    /* Board snapshot including the active piece – used for real-time opponent sync */
+    _serializeBoardWithActivePiece() {
+      const snapshot = this.board.map(row => row.map(c => c || 0));
+      const p = this.currentPiece;
+      if (p) {
+        for (let r = 0; r < p.shape.length; r++) {
+          for (let c = 0; c < p.shape[r].length; c++) {
+            if (!p.shape[r][c]) continue;
+            const ny = p.y + r;
+            const nx = p.x + c;
+            if (ny >= 0 && ny < this.ROWS && nx >= 0 && nx < this.COLS) {
+              snapshot[ny][nx] = p.color;
+            }
+          }
+        }
+      }
+      return snapshot;
     }
   }
 
