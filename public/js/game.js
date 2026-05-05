@@ -272,6 +272,7 @@
   function togglePause() {
     if (game.isGameOver) return;
     const paused = game.togglePause();
+    paused ? pauseBgm() : resumeBgm();
     if (pauseOverlay) {
       paused ? pauseOverlay.classList.remove('hidden') : pauseOverlay.classList.add('hidden');
     }
@@ -328,6 +329,8 @@
   function endGame(score, lines, level) {
     if (_gameEnded) return;
     _gameEnded = true;
+
+    stopBgm();
 
     clearInterval(timerInterval);
     timerInterval = null;
