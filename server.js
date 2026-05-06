@@ -161,6 +161,21 @@ function getLobbyPlayerList(code) {
   });
 }
 
+function normalizePlayerName(name) {
+  return String(name || '').trim().toLowerCase();
+}
+
+function isNameTakenInLobby(lobby, name, excludeId = null) {
+  if (!lobby) return false;
+  const target = normalizePlayerName(name);
+  if (!target) return false;
+  return lobby.players.some(cid => {
+    if (cid === excludeId) return false;
+    const p = players.get(cid);
+    return p && normalizePlayerName(p.name) === target;
+  });
+}
+
 /* ─────────────────────────────────────────
    Static file server
 ───────────────────────────────────────── */
@@ -324,11 +339,31 @@ function handleSetName(clientId, msg) {
     return;
   }
 
+  if (player && player.lobbyCode) {
+    const lobby = lobbies.get(player.lobbyCode);
+    if (isNameTakenInLobby(lobby, name, clientId)) {
+      sendTo(clientId, { type: 'error', message: 'Name already taken in this lobby.' });
+      return;
+    }
+  }
+
   player.name = name;
   player.hasCustomName = true;
   const stats = playerStats.get(clientId);
   if (stats) stats.name = name;
   sendTo(clientId, { type: 'name_set', name });
+
+  if (player && player.lobbyCode) {
+    const lobby = lobbies.get(player.lobbyCode);
+    if (lobby) {
+      broadcastToLobby(player.lobbyCode, {
+        type: 'lobby_updated',
+        code: player.lobbyCode,
+        gameMode: lobby.gameMode,
+        players: getLobbyPlayerList(player.lobbyCode),
+      });
+    }
+  }
 }
 
 function handleCreateLobby(clientId, msg) {
@@ -371,6 +406,9 @@ function handleJoinLobby(clientId, msg) {
   if (!lobby) return sendTo(clientId, { type: 'error', message: 'Lobby not found.' });
   if (lobby.status !== 'waiting') return sendTo(clientId, { type: 'error', message: 'Game already in progress.' });
   if (lobby.players.length >= 2) return sendTo(clientId, { type: 'error', message: 'Lobby is full.' });
+  if (isNameTakenInLobby(lobby, player.name, clientId)) {
+    return sendTo(clientId, { type: 'error', message: 'Name already taken in this lobby.' });
+  }
 
   if (player.lobbyCode) leaveLobby(clientId, player.lobbyCode);
 
