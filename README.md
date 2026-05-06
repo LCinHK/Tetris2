@@ -98,6 +98,7 @@ Tetris2/
 - 7-bag random piece generator using a seeded Mulberry32 PRNG (so both players draw identical piece sequences)
 - Full SRS (Super Rotation System) wall-kick tables for all pieces
 - Ghost piece, hold, scoring (with level multiplier and optional 2× score boost)
+- Line-clear base scores: 1 line = 100, 2 = 300, 3 = 500, 4 = 1200 (before level and score boost)
 - `addGarbageLines()` for Obstacle mode; `activateScoreBoost()` for cheat effect
 
 **`public/js/network.js`** — thin WebSocket wrapper loaded on every page:

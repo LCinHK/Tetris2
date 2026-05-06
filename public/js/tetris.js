@@ -45,7 +45,7 @@
     };
 
     /* Scoring */
-    const LINE_SCORES = [0, 100, 300, 500, 800];
+    const LINE_SCORES = [0, 100, 300, 500, 1200];
 
     /* Drop-speed table: interval in ms per level (1–20+) */
     function dropInterval(level) {
