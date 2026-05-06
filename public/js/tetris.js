@@ -518,6 +518,13 @@
             this._drawMini(ctx, this.nextPiece, cell);
         }
 
+        drawCountdownPreview() {
+            if (!this.nextCanvas || !this.currentPiece) return;
+            const ctx = this.nextCanvas.getContext('2d');
+            const cell = Math.floor(this.nextCanvas.width / 4);
+            this._drawMini(ctx, this.currentPiece, cell);
+        }
+
         _drawHold() {
             if (!this.holdCanvas) return;
             const ctx = this.holdCanvas.getContext('2d');

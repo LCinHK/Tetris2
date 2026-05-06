@@ -388,6 +388,7 @@
             _countdownTick = null;
         }
 
+        game.drawCountdownPreview();
         countdownOverlay.classList.remove('hidden');
         let count = 3;
         countdownText.textContent = count;
