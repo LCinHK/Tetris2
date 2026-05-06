@@ -4,6 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
+const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
 
@@ -17,19 +18,114 @@ const playerStats = new Map(); // clientId → stats object
 let clientIdCounter = 0;
 
 /* ─────────────────────────────────────────
-   Cheat code sequences (escalating difficulty)
-───────────────────────────────────────── */
-const CHEAT_SEQUENCES = [
-  ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight'],
-  ['ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'ArrowUp'],
-  ['ArrowRight', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft', 'ArrowDown'],
-  ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'],
-  ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'],
-];
+   Cheat codes
 
-function getCheatSequence(activationCount) {
-  const idx = Math.min(activationCount, CHEAT_SEQUENCES.length - 1);
-  return CHEAT_SEQUENCES[idx];
+   Requirements:
+   - Randomised sequences (deterministic per game to keep tests stable)
+   - Pattern: each key is pressed twice (pairs)
+   - Escalating difficulty after each activation
+   - Limited to 5 activations per player per game
+   - Each activation grants 2 of 3 advantages:
+       1) score boost (2× scoring for 30s)
+       2) add garbage line to opponent every 5s for 10s (2 lines)
+       3) slow drop speed for player for 30s
+───────────────────────────────────────── */
+
+const MAX_CHEAT_USES_PER_GAME = 5;
+
+const CHEAT_KEYS_ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+const CHEAT_KEYS_NUMPAD = ['Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'Numpad5', 'Numpad6', 'Numpad7', 'Numpad8', 'Numpad9'];
+
+function fnv1a32(input) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+function mulberry32(seed) {
+  let s = seed >>> 0;
+  return function () {
+    s += 0x6d2b79f5;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function _cheatKeyPool(activationCount) {
+  // Gradually add numpad keys as sequences get harder.
+  if (activationCount >= 2) return [...CHEAT_KEYS_ARROWS, ...CHEAT_KEYS_NUMPAD];
+  return [...CHEAT_KEYS_ARROWS];
+}
+
+function getCheatSequence(activationCount, gameSeed = 0, clientId = '') {
+  const safeCount = Math.max(0, Math.floor(Number(activationCount) || 0));
+  const pairs = 3 + Math.min(safeCount, MAX_CHEAT_USES_PER_GAME + 1); // 3..9 pairs (beyond limit, still defined)
+  const pool = _cheatKeyPool(safeCount);
+
+  const seed = fnv1a32(`${gameSeed}:${clientId}:${safeCount}`);
+  const rng = mulberry32(seed);
+  const seq = [];
+
+  let last = null;
+  for (let i = 0; i < pairs; i++) {
+    let key;
+    do {
+      key = pool[Math.floor(rng() * pool.length)];
+    } while (pool.length > 1 && key === last);
+    last = key;
+    seq.push(key, key);
+  }
+
+  return seq;
+}
+
+function _pickTwoEffects({ lobby, clientId, activationCount }) {
+  const player = players.get(clientId);
+  const hasOpponent = lobby && Array.isArray(lobby.players) && lobby.players.some(id => id !== clientId);
+
+  const effects = [
+    { type: 'score_boost', duration: 30000 },
+    { type: 'slow_drop', duration: 30000, multiplier: 1.7 },
+  ];
+  if (hasOpponent) {
+    effects.push({ type: 'garbage_pulse', duration: 10000, intervalMs: 5000, linesPerTick: 1, ticks: 2 });
+  }
+
+  // Deterministic shuffle based on game seed + clientId + activationCount.
+  const gameSeed = lobby && lobby.seed ? lobby.seed : 0;
+  const rng = mulberry32(fnv1a32(`${gameSeed}:effects:${clientId}:${activationCount}`));
+  for (let i = effects.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [effects[i], effects[j]] = [effects[j], effects[i]];
+  }
+
+  return effects.slice(0, 2);
+}
+
+function _scheduleGarbagePulse(lobbyCode, fromClientId, { ticks = 2, intervalMs = 5000, linesPerTick = 1 } = {}) {
+  const lobby = lobbies.get(lobbyCode);
+  if (!lobby) return;
+
+  const targets = lobby.players.filter(id => id !== fromClientId);
+  if (targets.length === 0) return;
+
+  for (let i = 0; i < ticks; i++) {
+    setTimeout(() => {
+      const currentLobby = lobbies.get(lobbyCode);
+      if (!currentLobby || currentLobby.status !== 'playing') return;
+
+      // Only apply if the opponent is still in-game.
+      targets.forEach(tid => {
+        const t = players.get(tid);
+        if (!t || t.gameOver) return;
+        sendTo(tid, { type: 'add_garbage', lines: linesPerTick });
+      });
+    }, i * intervalMs);
+  }
 }
 
 /* ─────────────────────────────────────────
@@ -154,6 +250,7 @@ wss.on('connection', (ws) => {
     lobbyCode: null,
     settings: { cheatEnabled: true, soundEnabled: true },
     cheatActivations: 0,
+    cheatCode: null,
     gameOver: false,
   });
 
@@ -197,6 +294,15 @@ function handleMessage(ws, msg) {
   const clientId = ws.clientId;
   const player = players.get(clientId);
   if (!player) return;
+
+  if (msg.type === 'cheat_activate') {
+    console.log('[cheat] message received', {
+      clientId,
+      hasPlayer: !!player,
+      lobbyCode: player.lobbyCode,
+      msgLobbyCode: msg.lobbyCode || null,
+    });
+  }
 
   switch (msg.type) {
     case 'set_name':         return handleSetName(clientId, msg);
@@ -252,7 +358,7 @@ function handleCreateLobby(clientId, msg) {
     gameMode,
     status: 'waiting',
     readyPlayers: new Set(),
-    cheatActivationCount: 0,
+    seed: 0,
   });
 
   player.lobbyCode = code;
@@ -289,6 +395,14 @@ function handleLeaveLobby(clientId) {
   if (player && player.lobbyCode) leaveLobby(clientId, player.lobbyCode);
 }
 
+function pruneLobbyPlayers(lobby) {
+  if (!lobby) return;
+  lobby.players = lobby.players.filter(id => players.has(id));
+  if (lobby.readyPlayers) {
+    lobby.readyPlayers = new Set([...lobby.readyPlayers].filter(id => players.has(id)));
+  }
+}
+
 function leaveLobby(clientId, code) {
   const lobby = lobbies.get(code);
   if (!lobby) return;
@@ -299,8 +413,12 @@ function leaveLobby(clientId, code) {
   const player = players.get(clientId);
   if (player) player.lobbyCode = null;
 
+  pruneLobbyPlayers(lobby);
+
   if (lobby.players.length === 0) {
-    lobbies.delete(code);
+    if (lobby.status !== 'playing') {
+      lobbies.delete(code);
+    }
   } else {
     if (lobby.host === clientId) lobby.host = lobby.players[0];
     broadcastToLobby(code, {
@@ -339,21 +457,32 @@ function startGame(code) {
   lobby.status = 'playing';
   lobby.startTime = Date.now();
 
-  // Reset game-over flags
+  // Reset game state
   lobby.players.forEach(cid => {
     const p = players.get(cid);
-    if (p) { p.gameOver = false; p.cheatActivations = 0; }
+    if (p) {
+      p.gameOver = false;
+      p.cheatActivations = 0;
+      p.cheatCode = null;
+    }
   });
 
-  const seed = Math.floor(Math.random() * 1000000);
-  const cheatCode = getCheatSequence(0);
+  const seed = crypto.randomInt(0, 1000000);
+  lobby.seed = seed;
 
-  broadcastToLobby(code, {
-    type: 'game_start',
-    seed,
-    gameMode: lobby.gameMode,
-    players: getLobbyPlayerList(code),
-    cheatCode,
+  // Each player gets their own cheat sequence (deterministic from seed + clientId).
+  lobby.players.forEach(cid => {
+    const p = players.get(cid);
+    if (p) p.cheatCode = getCheatSequence(0, seed, cid);
+    sendTo(cid, {
+      type: 'game_start',
+      seed,
+      gameMode: lobby.gameMode,
+      players: getLobbyPlayerList(code),
+      cheatCode: p ? p.cheatCode : getCheatSequence(0, seed, cid),
+      cheatUsesMax: MAX_CHEAT_USES_PER_GAME,
+      cheatUsesRemaining: MAX_CHEAT_USES_PER_GAME - (p ? p.cheatActivations : 0),
+    });
   });
 }
 
@@ -389,39 +518,108 @@ function handleLinesCleared(clientId, msg) {
 
 function handleCheatActivate(clientId, msg) {
   const player = players.get(clientId);
-  if (!player || !player.lobbyCode) return;
+  if (!player) return;
+
+  if (!player.lobbyCode && msg.lobbyCode) {
+    const code = String(msg.lobbyCode || '').toUpperCase().trim();
+    const lobby = lobbies.get(code);
+    if (lobby) pruneLobbyPlayers(lobby);
+    console.log('[cheat] reattach check', {
+      clientId,
+      msgLobbyCode: code,
+      lobbyFound: !!lobby,
+      lobbyStatus: lobby ? lobby.status : null,
+      lobbyPlayers: lobby ? lobby.players.length : null,
+    });
+    if (lobby && lobby.status === 'playing') {
+      player.lobbyCode = code;
+      if (!lobby.players.includes(clientId)) lobby.players.push(clientId);
+      console.log('[cheat] lobby reattached', { clientId, lobbyCode: code });
+    }
+  }
+
+  if (!player.lobbyCode) {
+    console.log('[cheat] rejected: no lobby', { clientId, hasPlayer: !!player });
+    return;
+  }
+
+  console.log('[cheat] activate request', {
+    clientId,
+    lobbyCode: player.lobbyCode,
+    sequenceLen: Array.isArray(msg.sequence) ? msg.sequence.length : null,
+    activations: player.cheatActivations,
+    cheatEnabled: player.settings && player.settings.cheatEnabled !== false,
+  });
 
   if (!player.settings.cheatEnabled) {
-    return sendTo(clientId, { type: 'cheat_invalid', reason: 'Cheats are disabled in settings.' });
+    console.log('[cheat] rejected: disabled in settings');
+    return sendTo(clientId, {
+      type: 'cheat_invalid',
+      reason: 'Cheats are disabled in settings.',
+      cheatUsesMax: MAX_CHEAT_USES_PER_GAME,
+      cheatUsesRemaining: Math.max(0, MAX_CHEAT_USES_PER_GAME - player.cheatActivations),
+    });
   }
 
   const lobby = lobbies.get(player.lobbyCode);
   if (!lobby) return;
 
-  const expected = getCheatSequence(lobby.cheatActivationCount);
-  if (JSON.stringify(msg.sequence) !== JSON.stringify(expected)) {
-    return sendTo(clientId, { type: 'cheat_invalid', reason: 'Incorrect sequence.' });
+  if (player.cheatActivations >= MAX_CHEAT_USES_PER_GAME) {
+    console.log('[cheat] rejected: limit reached');
+    return sendTo(clientId, {
+      type: 'cheat_invalid',
+      reason: `Cheat limit reached (${MAX_CHEAT_USES_PER_GAME} per game).`,
+      cheatUsesMax: MAX_CHEAT_USES_PER_GAME,
+      cheatUsesRemaining: 0,
+    });
   }
 
-  // Alternate between effects
-  const cheatType = lobby.cheatActivationCount % 2 === 0 ? 'score_boost' : 'opponent_obfuscate';
-  lobby.cheatActivationCount++;
-  const nextCode = getCheatSequence(lobby.cheatActivationCount);
+  const expected = player.cheatCode || getCheatSequence(player.cheatActivations, lobby.seed, clientId);
+  const isManual = !!msg.manual;
+  if (!isManual && JSON.stringify(msg.sequence) !== JSON.stringify(expected)) {
+    console.log('[cheat] rejected: incorrect sequence');
+    return sendTo(clientId, {
+      type: 'cheat_invalid',
+      reason: 'Incorrect sequence.',
+      cheatUsesMax: MAX_CHEAT_USES_PER_GAME,
+      cheatUsesRemaining: Math.max(0, MAX_CHEAT_USES_PER_GAME - player.cheatActivations),
+    });
+  }
+  if (isManual) {
+    console.log('[cheat] manual activation bypassed sequence check');
+  }
+
+  const activationIndex = player.cheatActivations;
+  const effects = _pickTwoEffects({ lobby, clientId, activationCount: activationIndex });
+
+  // Apply side-effects that are server-driven (garbage pulse to opponent).
+  for (const eff of effects) {
+    if (eff.type === 'garbage_pulse') {
+      _scheduleGarbagePulse(player.lobbyCode, clientId, {
+        ticks: eff.ticks,
+        intervalMs: eff.intervalMs,
+        linesPerTick: eff.linesPerTick,
+      });
+    }
+  }
+
+  player.cheatActivations++;
+  const nextCode = getCheatSequence(player.cheatActivations, lobby.seed, clientId);
+  player.cheatCode = nextCode;
+
+  const duration = effects.reduce((max, e) => Math.max(max, Number(e.duration) || 0), 0);
+  const remaining = Math.max(0, MAX_CHEAT_USES_PER_GAME - player.cheatActivations);
 
   sendTo(clientId, {
     type: 'cheat_activated',
-    cheatType,
-    duration: 30000,
+    effects,
+    duration,
     nextCheatCode: nextCode,
+    cheatUsesMax: MAX_CHEAT_USES_PER_GAME,
+    cheatUsesRemaining: remaining,
   });
 
-  if (cheatType === 'opponent_obfuscate') {
-    broadcastToLobby(player.lobbyCode, {
-      type: 'cheat_effect',
-      effect: 'obfuscate',
-      duration: 10000,
-    }, clientId);
-  }
+  console.log('[cheat] activated', { clientId, remaining, effects });
 }
 
 function handleGameOver(clientId, msg) {

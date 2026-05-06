@@ -98,6 +98,10 @@
             // When enabled (ms > 0), the level will increase as active (unpaused) play time elapses.
             // Level still increases via cleared lines; effective level is max(lines-based, time-based).
             this.levelUpByTimeMs = Number(options.levelUpByTimeMs || 0);
+            // Cheat effect: slow the player's drop speed temporarily.
+            // Multiplier > 1 means slower (bigger interval between auto-drops).
+            this.dropIntervalMultiplier = 1;
+            this._slowDropTimer = null;
 
             canvas.width = this.COLS * this.CELL;
             canvas.height = this.ROWS * this.CELL;
@@ -131,6 +135,9 @@
             this._lastDrop = 0;
             this._lastFrameTs = 0;
             this._elapsedActiveMs = 0;
+            this.dropIntervalMultiplier = 1;
+            clearTimeout(this._slowDropTimer);
+            this._slowDropTimer = null;
             this._raf = null;
             this._rng = SeededRandom(seed);
             this._bag = [];
@@ -375,6 +382,17 @@
             setTimeout(() => { this.scoreBoost = false; }, durationMs);
         }
 
+        /* Slow down auto-drop for a limited time (cheat advantage) */
+        activateSlowDrop(durationMs, multiplier = 1.7) {
+            const m = Math.max(1.05, Number(multiplier) || 1.7);
+            this.dropIntervalMultiplier = m;
+            clearTimeout(this._slowDropTimer);
+            this._slowDropTimer = setTimeout(() => {
+                this.dropIntervalMultiplier = 1;
+                this._slowDropTimer = null;
+            }, durationMs);
+        }
+
         /* ── Game loop ─────────────────────────────────────────────── */
         start(seed) {
             if (seed !== undefined) this._reset(seed);
@@ -398,7 +416,7 @@
             }
             this._lastFrameTs = ts;
 
-            const interval = dropInterval(this.level);
+            const interval = dropInterval(this.level) * (this.dropIntervalMultiplier || 1);
             if (ts - this._lastDrop >= interval) {
                 if (this._fits(this.currentPiece, 0, 1)) {
                     this.currentPiece.y++;

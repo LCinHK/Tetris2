@@ -23,7 +23,7 @@ A real-time, two-player competitive Tetris game built entirely with Node.js and 
 - 🃏 **Three game modes**: Score Attack, Time Attack (3 min), Obstacle (garbage lines)
 - 👻 **Ghost piece**, **hold piece**, **next piece preview**
 - 📊 **Per-session stats**: games played, high score, lines cleared, win/loss record, recent score history
-- 🔑 **Escalating cheat codes** (Konami-style arrow-key sequences) for score boosts or opponent board obfuscation
+- 🔑 **Escalating cheat codes** (Konami-style arrow-key sequences) granting 2 of 3 advantages (score boost / slow drop / garbage pulse)
 - ⚙️ **Persistent settings** (cheat on/off, sound on/off, default game mode) stored per WebSocket session
 - 🛡️ Path-traversal protection on the static file server
 - ✅ Unit-tested server with Node.js built-in test runner (no extra test framework)
@@ -152,12 +152,23 @@ Test coverage includes: HTTP static file serving, path-traversal blocking, WebSo
 
 ## Cheat Codes
 
-Cheat codes are optional (toggled in Settings). When enabled, the server sends an arrow-key sequence at game start. Enter it using the arrow keys during gameplay:
+Cheat codes are optional (toggled in Settings). When enabled, the server sends each player a unique key sequence at game start.
 
-- **Even activations** → `score_boost`: doubles scoring for 30 seconds
-- **Odd activations** → `opponent_obfuscate`: obfuscates the opponent's board for 10 seconds
+### Usage rules
 
-Each successful activation unlocks a longer, harder sequence for the next cheat. Up to 5 escalating sequences are defined.
+- **Max 5 activations per player per game**
+- Each activation unlocks a **harder** sequence (more keys)
+- Sequences are **randomised per game** (but deterministic from the game seed)
+- Sequence pattern: **every key must be pressed twice** (e.g. `↑ ↑ NP4 NP4 → → ...`)
+- Keys may include **arrow keys** and (at higher difficulty) **numpad keys** (`Numpad1`–`Numpad9`)
+
+### Effects
+
+On each successful activation, the player receives **2 of these 3 advantages**:
+
+1) `score_boost` — doubles scoring for 30 seconds
+2) `garbage_pulse` — adds 1 garbage line to the opponent every 5 seconds for 10 seconds (2 lines total)
+3) `slow_drop` — slows the player's block auto-drop for 30 seconds
 
 ---
 
@@ -192,12 +203,12 @@ All messages are JSON objects with a `type` field.
 | `lobby_joined` | `code`, `gameMode`, `players` | Joined an existing lobby |
 | `lobby_updated` | `players` | Player list changed |
 | `player_ready` | `playerId`, `players` | A player marked themselves ready |
-| `game_start` | `seed`, `gameMode`, `players`, `cheatCode` | Game begins; `seed` drives the shared RNG |
+| `game_start` | `seed`, `gameMode`, `players`, `cheatCode`, `cheatUsesMax`, `cheatUsesRemaining` | Game begins; `seed` drives the shared RNG |
 | `opponent_update` | `board`, `score`, `level`, `lines` | Opponent's board state |
 | `add_garbage` | `lines` | Add N garbage rows (Obstacle mode) |
 | `opponent_game_over` | `score`, `playerName` | Opponent's game ended |
-| `cheat_activated` | `cheatType`, `duration`, `nextCheatCode` | Cheat accepted |
-| `cheat_invalid` | `reason` | Cheat rejected |
+| `cheat_activated` | `effects`, `duration`, `nextCheatCode`, `cheatUsesMax`, `cheatUsesRemaining` | Cheat accepted; grants exactly 2 effects |
+| `cheat_invalid` | `reason`, `cheatUsesMax`, `cheatUsesRemaining` | Cheat rejected |
 | `cheat_effect` | `effect`, `duration` | Effect applied to this player (e.g. obfuscate) |
 | `game_over_confirmed` | `stats` | Server confirms game-over and returns updated stats |
 | `stats` | `stats` | Response to `get_stats` |

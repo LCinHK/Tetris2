@@ -116,6 +116,8 @@
     const countdownOverlay = document.getElementById('countdownOverlay');
     const countdownText = document.getElementById('countdownText');
     const myBoardLabel = document.getElementById('myBoardLabel');
+    const cheatActivateBtn = document.getElementById('cheatActivateBtn');
+    const cheatUsesDisplay = document.getElementById('cheatUsesDisplay');
 
     /* ── Mode badge ──────────────────────────────────────────────── */
     const modeLabels = { score_attack: 'Score Attack', time_attack: 'Time Attack', obstacle: 'Obstacle' };
@@ -217,7 +219,18 @@
     const cheat = new CheatManager({
         enabled: settings.cheatEnabled !== false,
         onActivate(seq) {
-            Network.send({ type: 'cheat_activate', sequence: seq });
+            const wsReady = Network.ws && Network.ws.readyState === WebSocket.OPEN;
+            console.log('[cheat] sending activation', { wsReady, sequence: seq });
+            if (!wsReady) {
+                notify('Cheat request failed (network not ready).', 'error');
+                return;
+            }
+            Network.send({
+                type: 'cheat_activate',
+                sequence: seq,
+                lobbyCode: gameConfig.lobbyCode || null,
+                manual: true,
+            });
         },
         onProgress(done, total) { /* handled by CheatManager internally */ },
         onDeactivate() {
@@ -228,6 +241,46 @@
 
     if (gameConfig.cheatCode) cheat.setSequence(gameConfig.cheatCode);
     cheat.attach();
+
+    function updateCheatUses({ cheatUsesMax, cheatUsesRemaining } = {}) {
+        if (!cheatUsesDisplay) return;
+        const max = Number(cheatUsesMax);
+        const remaining = Number(cheatUsesRemaining);
+        if (Number.isFinite(max) && Number.isFinite(remaining)) {
+            cheatUsesDisplay.textContent = `Uses: ${remaining}/${max}`;
+            if (cheatActivateBtn) cheatActivateBtn.disabled = remaining <= 0;
+        }
+    }
+
+    updateCheatUses({
+        cheatUsesMax: gameConfig.cheatUsesMax,
+        cheatUsesRemaining: gameConfig.cheatUsesRemaining,
+    });
+
+    function tryActivateCheat() {
+        if (!gameStarted) {
+            notify('Cheat available after the game starts.', 'error');
+            return;
+        }
+        console.log('[cheat] manual activation requested', {
+            lobbyCode: gameConfig.lobbyCode || null,
+            cheatCodeLen: Array.isArray(gameConfig.cheatCode) ? gameConfig.cheatCode.length : null,
+            clientId: Network.clientId || null,
+        });
+        if (cheat.triggerManual()) return;
+        if (cheat.isActive()) {
+            notify('Cheat already active.', 'error');
+        } else {
+            notify('Cheat not ready yet.', 'error');
+        }
+    }
+
+    if (cheatActivateBtn) {
+        cheatActivateBtn.addEventListener('click', () => {
+            if (game.isGameOver) return;
+            tryActivateCheat();
+        });
+    }
 
     /* ── Keyboard controls ───────────────────────────────────────── */
     let hardDropLocked = false;
@@ -245,7 +298,7 @@
         }
 
         // While paused, only allow unpausing.
-        if (game.isPaused && !(e.key === 'p' || e.key === 'P')) {
+        if (game.isPaused && !(e.key === 'p' || e.key === 'P' || e.key === 'F2')) {
             // Prevent browser scrolling on arrow keys/space.
             if (['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', ' '].includes(e.key)) {
                 e.preventDefault();
@@ -263,6 +316,10 @@
                 break;
             case 'c': case 'C': game.hold(); break;
             case 'p': case 'P': togglePause(); break;
+            case 'F2':
+                e.preventDefault();
+                tryActivateCheat();
+                break;
         }
     });
 
@@ -406,17 +463,31 @@
     });
 
     Network.on('cheat_activated', (msg) => {
+        console.log('[cheat] activated', msg);
         cheat.markActive(msg.duration || 30000);
-        if (msg.cheatType === 'score_boost') {
-            game.activateScoreBoost(msg.duration || 30000);
-            notify('🚀 Score Boost activated! (2× for 30s)', 'success');
-        } else if (msg.cheatType === 'opponent_obfuscate') {
-            notify('👁 Opponent obfuscated for 10s!', 'success');
-        }
+
+        const effects = Array.isArray(msg.effects)
+            ? msg.effects
+            : (msg.cheatType ? [{ type: msg.cheatType, duration: msg.duration }] : []);
+
+        effects.forEach((eff) => {
+            if (eff.type === 'score_boost') {
+                game.activateScoreBoost(eff.duration || 30000);
+                notify('🚀 Score Boost activated! (2× for 30s)', 'success');
+            } else if (eff.type === 'slow_drop') {
+                game.activateSlowDrop(eff.duration || 30000, eff.multiplier || 1.7);
+                notify('🐢 Slow Drop activated! (easier control)', 'success');
+            } else if (eff.type === 'opponent_obfuscate') {
+                notify('👁 Opponent obfuscated for 10s!', 'success');
+            }
+        });
+
         if (msg.nextCheatCode) cheat.setSequence(msg.nextCheatCode);
+        updateCheatUses(msg);
     });
 
     Network.on('cheat_effect', (msg) => {
+        console.log('[cheat] effect received', msg);
         if (msg.effect === 'obfuscate') {
             gameCanvas.classList.add('obfuscated');
             notify('⚠ Screen obfuscated by opponent!', 'error');
@@ -425,12 +496,15 @@
     });
 
     Network.on('cheat_invalid', (msg) => {
+        console.log('[cheat] invalid', msg);
         notify(msg.reason || 'Invalid cheat sequence.', 'error');
+        updateCheatUses(msg);
     });
 
     Network.on('game_start', (msg) => {
         // In case we receive this while on game page (reconnect scenario)
         if (msg.cheatCode) cheat.setSequence(msg.cheatCode);
+        updateCheatUses(msg);
     });
 
     /* ── Home button ─────────────────────────────────────────────── */

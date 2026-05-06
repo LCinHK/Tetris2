@@ -224,6 +224,8 @@
       seed:      msg.seed,
       players:   msg.players,
       cheatCode: msg.cheatCode,
+      cheatUsesMax: msg.cheatUsesMax,
+      cheatUsesRemaining: msg.cheatUsesRemaining,
     }));
     const settings = _loadSettings();
     localStorage.setItem('settings', JSON.stringify(

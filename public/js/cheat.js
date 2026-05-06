@@ -77,6 +77,7 @@
     _trigger() {
       const seq = [...this._progress];
       this._progress = [];
+      console.log('[cheat] sequence complete, sending activation');
       this.onActivate(seq);
     }
 
@@ -93,6 +94,15 @@
     }
 
     isActive() { return this._active; }
+
+    /* Trigger activation without typing the sequence */
+    triggerManual() {
+      if (!this.enabled || this._active || !this._sequence.length) return false;
+      this._progress = [...this._sequence];
+      this._renderKeys();
+      this._trigger();
+      return true;
+    }
 
     /* ── UI helpers ─────────────────────────────────────────────── */
     _renderKeys() {

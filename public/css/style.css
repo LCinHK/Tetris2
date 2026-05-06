@@ -338,6 +338,19 @@ canvas#opponentCanvas {
   font-weight: 600;
 }
 
+#cheatUsesDisplay {
+  margin-top: .2rem;
+  font-size: .75rem;
+  color: var(--text-dim);
+}
+
+#cheatActivateBtn {
+  margin-top: .5rem;
+  width: auto;
+  padding: .35rem .75rem;
+  font-size: .75rem;
+}
+
 /* Timer (time attack) */
 #timerDisplay {
   font-size: 1.6rem;
