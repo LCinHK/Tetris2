@@ -121,16 +121,21 @@
   const modeLabels = { score_attack: 'Score Attack', time_attack: 'Time Attack', obstacle: 'Obstacle' };
   if (modeBadge) modeBadge.textContent = modeLabels[gameMode] || gameMode;
 
-  /* ── Show opponent area if multiplayer ───────────────────────── */
-  if (!isSolo && opponentArea) {
-    opponentArea.classList.remove('hidden');
-    opponentArea.style.display = 'flex';
-    if (gameConfig.players) {
+  /* ── Show opponent area only in multiplayer ─────────────────── */
+  if (opponentArea) {
+    if (isSolo) {
+      opponentArea.classList.add('hidden');
+      opponentArea.style.display = 'none';
+    } else {
+      opponentArea.classList.remove('hidden');
+      opponentArea.style.display = 'flex';
       const myId = Network.clientId || '';
       const opp  = gameConfig.players.find(p => p.id !== myId);
       if (opp && opponentLabel) opponentLabel.textContent = opp.name || 'OPPONENT';
     }
   }
+
+  /* ── Show player name on their board ─────────────────────────── */
   if (myBoardLabel && Network.playerName) {
     myBoardLabel.textContent = Network.playerName.toUpperCase();
   }
