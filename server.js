@@ -25,7 +25,7 @@ let clientIdCounter = 0;
    - Pattern: each key is pressed twice (pairs)
    - Escalating difficulty after each activation
    - Limited to 5 activations per player per game
-   - Each activation grants 2 of 3 advantages:
+    - Each activation grants all advantages (garbage pulse only if opponent present):
        1) score boost (2× scoring for 30s)
        2) add garbage line to opponent every 5s for 10s (2 lines)
        3) slow drop speed for player for 30s
@@ -34,7 +34,7 @@ let clientIdCounter = 0;
 const MAX_CHEAT_USES_PER_GAME = 5;
 
 const CHEAT_KEYS_ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-const CHEAT_KEYS_NUMPAD = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const CHEAT_KEYS_DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 function fnv1a32(input) {
   let hash = 0x811c9dc5;
@@ -56,8 +56,8 @@ function mulberry32(seed) {
 }
 
 function _cheatKeyPool(activationCount) {
-  // Gradually add numpad keys as sequences get harder.
-  if (activationCount >= 2) return [...CHEAT_KEYS_ARROWS, ...CHEAT_KEYS_NUMPAD];
+  // Gradually add digit keys as sequences get harder.
+  if (activationCount >= 2) return [...CHEAT_KEYS_ARROWS, ...CHEAT_KEYS_DIGITS];
   return [...CHEAT_KEYS_ARROWS];
 }
 
@@ -83,9 +83,9 @@ function getCheatSequence(activationCount, gameSeed = 0, clientId = '') {
   return seq;
 }
 
-function _pickTwoEffects({ lobby, clientId, activationCount }) {
+function _pickAllEffects({ lobby, clientId, activationCount }) {
   const player = players.get(clientId);
-  const hasOpponent = lobby && Array.isArray(lobby.players) && lobby.players.some(id => id !== clientId);
+  const hasOpponent = lobby && Number(lobby.startPlayersCount || 0) > 1;
 
   const effects = [
     { type: 'score_boost', duration: 30000 },
@@ -95,28 +95,20 @@ function _pickTwoEffects({ lobby, clientId, activationCount }) {
     effects.push({ type: 'garbage_pulse', duration: 10000, intervalMs: 5000, linesPerTick: 1, ticks: 2 });
   }
 
-  // Deterministic shuffle based on game seed + clientId + activationCount.
-  const gameSeed = lobby && lobby.seed ? lobby.seed : 0;
-  const rng = mulberry32(fnv1a32(`${gameSeed}:effects:${clientId}:${activationCount}`));
-  for (let i = effects.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [effects[i], effects[j]] = [effects[j], effects[i]];
-  }
-
-  return effects.slice(0, 2);
+  return effects;
 }
 
 function _scheduleGarbagePulse(lobbyCode, fromClientId, { ticks = 2, intervalMs = 5000, linesPerTick = 1 } = {}) {
   const lobby = lobbies.get(lobbyCode);
   if (!lobby) return;
 
-  const targets = lobby.players.filter(id => id !== fromClientId);
-  if (targets.length === 0) return;
-
   for (let i = 0; i < ticks; i++) {
     setTimeout(() => {
       const currentLobby = lobbies.get(lobbyCode);
       if (!currentLobby || currentLobby.status !== 'playing') return;
+
+      const targets = currentLobby.players.filter(id => id !== fromClientId);
+      if (targets.length === 0) return;
 
       // Only apply if the opponent is still in-game.
       targets.forEach(tid => {
@@ -456,6 +448,7 @@ function startGame(code) {
 
   lobby.status = 'playing';
   lobby.startTime = Date.now();
+  lobby.startPlayersCount = lobby.players.length;
 
   // Reset game state
   lobby.players.forEach(cid => {
@@ -590,7 +583,7 @@ function handleCheatActivate(clientId, msg) {
   }
 
   const activationIndex = player.cheatActivations;
-  const effects = _pickTwoEffects({ lobby, clientId, activationCount: activationIndex });
+  const effects = _pickAllEffects({ lobby, clientId, activationCount: activationIndex });
 
   // Apply side-effects that are server-driven (garbage pulse to opponent).
   for (const eff of effects) {

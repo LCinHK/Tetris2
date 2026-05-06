@@ -500,19 +500,24 @@
             ? msg.effects
             : (msg.cheatType ? [{ type: msg.cheatType, duration: msg.duration }] : []);
 
+        const effectLabels = [];
         effects.forEach((eff) => {
             if (eff.type === 'score_boost') {
                 game.activateScoreBoost(eff.duration || 30000);
-                notify('🚀 Score Boost activated! (2× for 30s)', 'success');
+                effectLabels.push('Score Boost');
             } else if (eff.type === 'slow_drop') {
                 game.activateSlowDrop(eff.duration || 30000, eff.multiplier || 1.7);
-                notify('🐢 Slow Drop activated! (easier control)', 'success');
+                effectLabels.push('Slow Drop');
             } else if (eff.type === 'garbage_pulse') {
-                notify('🧨 Garbage pulse sent to opponent!', 'success');
+                if (!isSolo) effectLabels.push('Garbage Pulse');
             } else if (eff.type === 'opponent_obfuscate') {
-                notify('👁 Opponent obfuscated for 10s!', 'success');
+                effectLabels.push('Opponent Obfuscate');
             }
         });
+
+        if (effectLabels.length > 0) {
+            notify(`Cheat activated: ${effectLabels.join(' + ')}`, 'success');
+        }
 
         startCheatTimer(msg.duration || 30000);
         if (msg.nextCheatCode) cheat.setSequence(msg.nextCheatCode);

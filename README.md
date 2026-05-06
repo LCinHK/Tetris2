@@ -6,14 +6,25 @@ A real-time, two-player competitive Tetris game built entirely with Node.js and 
 
 ## Table of Contents
 
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-- [Running Tests](#running-tests)
-- [Game Modes](#game-modes)
-- [Cheat Codes](#cheat-codes)
-- [WebSocket Message Reference](#websocket-message-reference)
+- [Tetris 2 – Competitive Multiplayer Tetris](#tetris-2--competitive-multiplayer-tetris)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Tech Stack](#tech-stack)
+  - [Project Structure](#project-structure)
+    - [Key modules explained](#key-modules-explained)
+  - [Getting Started](#getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Install \& run](#install--run)
+    - [Configuration](#configuration)
+  - [Running Tests](#running-tests)
+  - [Game Modes](#game-modes)
+  - [Cheat Codes](#cheat-codes)
+    - [Usage rules](#usage-rules)
+    - [Effects](#effects)
+  - [WebSocket Message Reference](#websocket-message-reference)
+    - [Client → Server](#client--server)
+    - [Server → Client](#server--client)
+  - [Known Limitations](#known-limitations)
 
 ---
 
@@ -160,11 +171,11 @@ Cheat codes are optional (toggled in Settings). When enabled, the server sends e
 - Each activation unlocks a **harder** sequence (more keys)
 - Sequences are **randomised per game** (but deterministic from the game seed)
 - Sequence pattern: **every key must be pressed twice** (e.g. `↑ ↑ 4 4 → → ...`)
-- Keys may include **arrow keys** and (at higher difficulty) **digit keys** (`1`–`9`)
+- Keys may include **arrow keys** and (at higher difficulty) **digit keys** (`1`–`9`, top-row — no numpad required)
 
 ### Effects
 
-On each successful activation, the player receives **2 of these 3 advantages**:
+On each successful activation, the player receives **all 3 advantages** (except `garbage_pulse` in solo games):
 
 1) `score_boost` — doubles scoring for 30 seconds
 2) `garbage_pulse` — adds 1 garbage line to the opponent every 5 seconds for 10 seconds (2 lines total)
@@ -207,7 +218,7 @@ All messages are JSON objects with a `type` field.
 | `opponent_update` | `board`, `score`, `level`, `lines` | Opponent's board state |
 | `add_garbage` | `lines` | Add N garbage rows (Obstacle mode) |
 | `opponent_game_over` | `score`, `playerName` | Opponent's game ended |
-| `cheat_activated` | `effects`, `duration`, `nextCheatCode`, `cheatUsesMax`, `cheatUsesRemaining` | Cheat accepted; grants exactly 2 effects |
+| `cheat_activated` | `effects`, `duration`, `nextCheatCode`, `cheatUsesMax`, `cheatUsesRemaining` | Cheat accepted; grants all effects (solo skips `garbage_pulse`) |
 | `cheat_invalid` | `reason`, `cheatUsesMax`, `cheatUsesRemaining` | Cheat rejected |
 | `cheat_effect` | `effect`, `duration` | Effect applied to this player (e.g. obfuscate) |
 | `game_over_confirmed` | `stats` | Server confirms game-over and returns updated stats |
