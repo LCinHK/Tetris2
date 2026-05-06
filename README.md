@@ -159,8 +159,8 @@ Cheat codes are optional (toggled in Settings). When enabled, the server sends e
 - **Max 5 activations per player per game**
 - Each activation unlocks a **harder** sequence (more keys)
 - Sequences are **randomised per game** (but deterministic from the game seed)
-- Sequence pattern: **every key must be pressed twice** (e.g. `↑ ↑ NP4 NP4 → → ...`)
-- Keys may include **arrow keys** and (at higher difficulty) **numpad keys** (`Numpad1`–`Numpad9`)
+- Sequence pattern: **every key must be pressed twice** (e.g. `↑ ↑ 4 4 → → ...`)
+- Keys may include **arrow keys** and (at higher difficulty) **digit keys** (`1`–`9`)
 
 ### Effects
 
@@ -187,7 +187,7 @@ All messages are JSON objects with a `type` field.
 | `player_ready` | — | Signal ready; game starts when all players ready |
 | `game_update` | `{ board, score, level, lines }` | Broadcast board state to opponent |
 | `lines_cleared` | `{ count, score }` | Notify server of cleared lines (triggers garbage in Obstacle mode) |
-| `cheat_activate` | `{ sequence }` | Submit a cheat-code key sequence |
+| `cheat_activate` | `{ sequence, manual }` | Submit a cheat-code key sequence or manual activation |
 | `game_over` | `{ score, linesCleared, gameMode }` | Report game over |
 | `get_stats` | — | Request current session stats |
 | `save_settings` | `{ settings }` | Persist settings on the server |

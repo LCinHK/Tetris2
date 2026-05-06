@@ -34,7 +34,7 @@ let clientIdCounter = 0;
 const MAX_CHEAT_USES_PER_GAME = 5;
 
 const CHEAT_KEYS_ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-const CHEAT_KEYS_NUMPAD = ['Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'Numpad5', 'Numpad6', 'Numpad7', 'Numpad8', 'Numpad9'];
+const CHEAT_KEYS_NUMPAD = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 function fnv1a32(input) {
   let hash = 0x811c9dc5;

@@ -118,6 +118,7 @@
     const myBoardLabel = document.getElementById('myBoardLabel');
     const cheatActivateBtn = document.getElementById('cheatActivateBtn');
     const cheatUsesDisplay = document.getElementById('cheatUsesDisplay');
+    const cheatTimerDisplay = document.getElementById('cheatTimerDisplay');
 
     /* ── Mode badge ──────────────────────────────────────────────── */
     const modeLabels = { score_attack: 'Score Attack', time_attack: 'Time Attack', obstacle: 'Obstacle' };
@@ -236,6 +237,7 @@
         onDeactivate() {
             game.scoreBoost = false;
             gameCanvas.classList.remove('obfuscated');
+            clearCheatTimer();
         },
     });
 
@@ -256,6 +258,34 @@
         cheatUsesMax: gameConfig.cheatUsesMax,
         cheatUsesRemaining: gameConfig.cheatUsesRemaining,
     });
+
+    let cheatTimerInterval = null;
+    let cheatTimerEnd = 0;
+
+    function clearCheatTimer() {
+        if (cheatTimerInterval) {
+            clearInterval(cheatTimerInterval);
+            cheatTimerInterval = null;
+        }
+        if (cheatTimerDisplay) cheatTimerDisplay.textContent = '';
+    }
+
+    function startCheatTimer(durationMs) {
+        if (!cheatTimerDisplay) return;
+        if (!Number.isFinite(durationMs) || durationMs <= 0) {
+            clearCheatTimer();
+            return;
+        }
+
+        cheatTimerEnd = Date.now() + durationMs;
+        clearCheatTimer();
+        cheatTimerInterval = setInterval(() => {
+            const leftMs = Math.max(0, cheatTimerEnd - Date.now());
+            const leftSec = Math.ceil(leftMs / 1000);
+            cheatTimerDisplay.textContent = `Cheat active: ${leftSec}s`;
+            if (leftMs <= 0) clearCheatTimer();
+        }, 250);
+    }
 
     function tryActivateCheat() {
         if (!gameStarted) {
@@ -477,11 +507,14 @@
             } else if (eff.type === 'slow_drop') {
                 game.activateSlowDrop(eff.duration || 30000, eff.multiplier || 1.7);
                 notify('🐢 Slow Drop activated! (easier control)', 'success');
+            } else if (eff.type === 'garbage_pulse') {
+                notify('🧨 Garbage pulse sent to opponent!', 'success');
             } else if (eff.type === 'opponent_obfuscate') {
                 notify('👁 Opponent obfuscated for 10s!', 'success');
             }
         });
 
+        startCheatTimer(msg.duration || 30000);
         if (msg.nextCheatCode) cheat.setSequence(msg.nextCheatCode);
         updateCheatUses(msg);
     });
