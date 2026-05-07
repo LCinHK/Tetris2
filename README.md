@@ -42,6 +42,12 @@ A real-time, two-player competitive Tetris game built entirely with Node.js and 
 - ⏸️ **Pause-safe Time Attack** — the countdown freezes while paused and resumes with the exact remaining time
 - 🏆 **Clear match outcomes** — the game-over screen shows Win / Loss / Time's Up based on how the game ended
 
+### Known missing / partial implementations
+
+- **Sound Effects** — the `soundEnabled` setting is saved/restored in `public/index.html`, `public/js/home.js`, and `server.js`, but there are no audio assets, `Audio`/`AudioContext` calls, or gameplay hooks that actually play sounds.
+- **Paused Time Attack clock** — `public/js/game.js` pauses the Tetris loop, but the `time_attack` countdown interval keeps running while the game is paused.
+- **Full game-over outcome flow** — `server.js` tracks wins/losses and `public/js/gameover.js` shows score/history, but the results page does not render an explicit win/loss outcome, and “Play Again” always returns to `/` instead of restarting the current lobby.
+
 ---
 
 ## Tech Stack

@@ -485,9 +485,13 @@
             score: msg.score,
             level: msg.level,
             lines: msg.lines,
+            playerName: msg.playerName,
             boardRows: Array.isArray(msg.board) ? msg.board.length : 0,
         });
         if (opponentArea && !opponentArea.classList.contains('hidden')) {
+            if (msg.playerName && opponentLabel) {
+                opponentLabel.textContent = msg.playerName.toUpperCase();
+            }
             if (msg.board) drawOpponentBoard(opponentCanvas, msg.board);
             if (opponentScore) opponentScore.textContent = (msg.score || 0).toLocaleString();
             _setText('opponentLevel', msg.level || 1);

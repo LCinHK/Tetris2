@@ -6,7 +6,7 @@ const path = require('path');
 const { WebSocketServer } = require('ws');
 const crypto = require('crypto');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8000;
 
 /* ─────────────────────────────────────────
    In-memory state
@@ -83,7 +83,7 @@ function getCheatSequence(activationCount, gameSeed = 0, clientId = '') {
   return seq;
 }
 
-function _pickAllEffects({ lobby, clientId, activationCount }) {
+function _pickAllEffects({ lobby, clientId}) {
   const player = players.get(clientId);
   const hasOpponent = lobby && Number(lobby.startPlayersCount || 0) > 1;
 
