@@ -571,14 +571,6 @@ function handleLinesCleared(clientId, msg) {
 
   const lobby = lobbies.get(player.lobbyCode);
   if (!lobby) return;
-
-  // Obstacle mode: send garbage lines to opponent
-  if (lobby.gameMode === 'obstacle') {
-    const garbage = Math.max(0, (msg.count || 0) - 1);
-    if (garbage > 0) {
-      broadcastToLobby(player.lobbyCode, { type: 'add_garbage', lines: garbage }, clientId);
-    }
-  }
 }
 
 function handleCheatActivate(clientId, msg) {

@@ -263,7 +263,7 @@
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
   function _modeLabel(mode) {
-    return { score_attack: 'Score Attack', time_attack: 'Time Attack (3 min)', obstacle: 'Obstacle' }[mode] || mode;
+    return { score_attack: 'Score Attack', time_attack: 'Time Attack (3 min)' }[mode] || mode;
   }
 
   /* ── Init ─────────────────────────────────────────────────────── */

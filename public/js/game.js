@@ -121,7 +121,7 @@
     const cheatTimerDisplay = document.getElementById('cheatTimerDisplay');
 
     /* ── Mode badge ──────────────────────────────────────────────── */
-    const modeLabels = { score_attack: 'Score Attack', time_attack: 'Time Attack', obstacle: 'Obstacle' };
+    const modeLabels = { score_attack: 'Score Attack', time_attack: 'Time Attack' };
     if (modeBadge) modeBadge.textContent = modeLabels[gameMode] || gameMode;
 
     /* ── Show opponent area if multiplayer ───────────────────────── */
@@ -504,13 +504,6 @@
         const overlay = document.getElementById('opponentOverlay');
         if (overlay) overlay.classList.remove('hidden');
         notify(`Opponent finished with ${(msg.score || 0).toLocaleString()} pts! You win!`, 'success');
-    });
-
-    Network.on('add_garbage', (msg) => {
-        if (msg.lines > 0) {
-            game.addGarbageLines(msg.lines);
-            notify(`+${msg.lines} garbage line${msg.lines > 1 ? 's' : ''}!`, 'error');
-        }
     });
 
     Network.on('cheat_activated', (msg) => {

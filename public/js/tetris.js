@@ -363,19 +363,6 @@
             return this.isPaused;
         }
 
-        /* Add garbage lines (obstacle mode) */
-        addGarbageLines(count) {
-            for (let i = 0; i < count; i++) {
-                const hole = Math.floor(Math.random() * this.COLS);
-                const row = new Array(this.COLS).fill('#555555');
-                row[hole] = null;
-                this.board.shift();
-                this.board.push(row);
-            }
-            this._draw();
-            this.onPieceMoved(this._serializeBoardWithActivePiece());
-        }
-
         /* Activate score-boost cheat */
         activateScoreBoost(durationMs) {
             this.scoreBoost = true;

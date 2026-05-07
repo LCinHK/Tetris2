@@ -31,7 +31,7 @@ A real-time, two-player competitive Tetris game built entirely with Node.js and 
 ## Features
 
 - 🎮 **1v1 multiplayer** via WebSockets with lobby codes
-- 🃏 **Three game modes**: Score Attack, Time Attack (3 min), Obstacle (garbage lines)
+- 🃏 **Two game modes**: Score Attack, Time Attack (3 min)
 - 👻 **Ghost piece**, **hold piece**, **next piece preview**
 - 📊 **Per-session stats**: games played, high score, lines cleared, win/loss record, recent score history
 - 🔑 **Escalating cheat codes** (Konami-style arrow-key sequences) granting 2 of 3 advantages (score boost / slow drop / garbage pulse)
@@ -154,7 +154,7 @@ npm test
 
 The test suite uses **Node.js's built-in test runner** (`node:test`) — no additional packages needed. It spins up a real HTTP + WebSocket server on a random port, runs all assertions, and tears down cleanly.
 
-Test coverage includes: HTTP static file serving, path-traversal blocking, WebSocket connection lifecycle, player name setting, lobby create/join/leave/full, game start, cheat-code activation and rejection, game-over stat recording, settings save/restore, and Obstacle mode garbage lines.
+Test coverage includes: HTTP static file serving, path-traversal blocking, WebSocket connection lifecycle, player name setting, lobby create/join/leave/full, game start, cheat-code activation and rejection, game-over stat recording, and settings save/restore.
 
 ---
 
@@ -164,7 +164,6 @@ Test coverage includes: HTTP static file serving, path-traversal blocking, WebSo
 |---|---|
 | **Score Attack** | Classic — highest score when the game ends wins |
 | **Time Attack** | 3-minute timer — most points when time runs out wins |
-| **Obstacle** | Clearing lines sends garbage rows to your opponent (clearing N lines sends N−1 garbage rows) |
 
 ---
 
@@ -204,7 +203,7 @@ All messages are JSON objects with a `type` field.
 | `leave_lobby` | — | Leave current lobby |
 | `player_ready` | — | Signal ready; game starts when all players ready |
 | `game_update` | `{ board, score, level, lines }` | Broadcast board state to opponent |
-| `lines_cleared` | `{ count, score }` | Notify server of cleared lines (triggers garbage in Obstacle mode) |
+| `lines_cleared` | `{ count, score }` | Notify server of cleared lines |
 | `cheat_activate` | `{ sequence, manual }` | Submit a cheat-code key sequence or manual activation |
 | `game_over` | `{ score, linesCleared, gameMode }` | Report game over |
 | `get_stats` | — | Request current session stats |
@@ -223,7 +222,6 @@ All messages are JSON objects with a `type` field.
 | `player_ready` | `playerId`, `players` | A player marked themselves ready |
 | `game_start` | `seed`, `gameMode`, `players`, `cheatCode`, `cheatUsesMax`, `cheatUsesRemaining` | Game begins; `seed` drives the shared RNG |
 | `opponent_update` | `board`, `score`, `level`, `lines` | Opponent's board state |
-| `add_garbage` | `lines` | Add N garbage rows (Obstacle mode) |
 | `opponent_game_over` | `score`, `playerName` | Opponent's game ended |
 | `cheat_activated` | `effects`, `duration`, `nextCheatCode`, `cheatUsesMax`, `cheatUsesRemaining` | Cheat accepted; grants all effects (solo skips `garbage_pulse`) |
 | `cheat_invalid` | `reason`, `cheatUsesMax`, `cheatUsesRemaining` | Cheat rejected |
