@@ -185,7 +185,12 @@
         },
         onLinesCleared({ count, score }) {
             playClearSound();
-            Network.send({ type: 'lines_cleared', count, score });
+            Network.send({
+                type: 'lines_cleared',
+                count,
+                score,
+                lobbyCode: gameConfig.lobbyCode || null,
+            });
         },
         onBoardUpdate(board) {
             // Always send after a piece locks (board state finalised)
@@ -196,6 +201,7 @@
                 score: game.score,
                 level: game.level,
                 lines: game.lines,
+                lobbyCode: gameConfig.lobbyCode || null,
             });
         },
         onPieceMoved(board) {
@@ -203,12 +209,20 @@
             const now = Date.now();
             if (now - _lastPieceMoveSend < 50) return;
             _lastPieceMoveSend = now;
+            console.log('[net] send game_update', {
+                ts: now,
+                score: game.score,
+                level: game.level,
+                lines: game.lines,
+                boardRows: Array.isArray(board) ? board.length : 0,
+            });
             Network.send({
                 type: 'game_update',
                 board,
                 score: game.score,
                 level: game.level,
                 lines: game.lines,
+                lobbyCode: gameConfig.lobbyCode || null,
             });
         },
         onGameOver({ score, lines, level }) {
@@ -221,7 +235,6 @@
         enabled: settings.cheatEnabled !== false,
         onActivate(seq) {
             const wsReady = Network.ws && Network.ws.readyState === WebSocket.OPEN;
-            console.log('[cheat] sending activation', { wsReady, sequence: seq });
             if (!wsReady) {
                 notify('Cheat request failed (network not ready).', 'error');
                 return;
@@ -292,11 +305,6 @@
             notify('Cheat available after the game starts.', 'error');
             return;
         }
-        console.log('[cheat] manual activation requested', {
-            lobbyCode: gameConfig.lobbyCode || null,
-            cheatCodeLen: Array.isArray(gameConfig.cheatCode) ? gameConfig.cheatCode.length : null,
-            clientId: Network.clientId || null,
-        });
         if (cheat.triggerManual()) return;
         if (cheat.isActive()) {
             notify('Cheat already active.', 'error');
@@ -446,6 +454,7 @@
             linesCleared: finalLines,
             level: finalLevel,
             gameMode,
+            lobbyCode: gameConfig.lobbyCode || null,
         });
 
         localStorage.setItem('lastGame', JSON.stringify({
@@ -471,6 +480,13 @@
 
     /* ── Network events ──────────────────────────────────────────── */
     Network.on('opponent_update', (msg) => {
+        console.log('[net] recv opponent_update', {
+            ts: Date.now(),
+            score: msg.score,
+            level: msg.level,
+            lines: msg.lines,
+            boardRows: Array.isArray(msg.board) ? msg.board.length : 0,
+        });
         if (opponentArea && !opponentArea.classList.contains('hidden')) {
             if (msg.board) drawOpponentBoard(opponentCanvas, msg.board);
             if (opponentScore) opponentScore.textContent = (msg.score || 0).toLocaleString();
@@ -494,7 +510,6 @@
     });
 
     Network.on('cheat_activated', (msg) => {
-        console.log('[cheat] activated', msg);
         cheat.markActive(msg.duration || 30000);
 
         const effects = Array.isArray(msg.effects)
@@ -526,7 +541,6 @@
     });
 
     Network.on('cheat_effect', (msg) => {
-        console.log('[cheat] effect received', msg);
         if (msg.effect === 'obfuscate') {
             gameCanvas.classList.add('obfuscated');
             notify('⚠ Screen obfuscated by opponent!', 'error');
@@ -535,7 +549,6 @@
     });
 
     Network.on('cheat_invalid', (msg) => {
-        console.log('[cheat] invalid', msg);
         notify(msg.reason || 'Invalid cheat sequence.', 'error');
         updateCheatUses(msg);
     });

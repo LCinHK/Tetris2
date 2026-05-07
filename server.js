@@ -279,7 +279,17 @@ wss.on('connection', (ws) => {
 
   ws.on('message', (raw) => {
     try {
-      handleMessage(ws, JSON.parse(raw));
+      const msg = JSON.parse(raw);
+      if (msg && msg.type === 'game_update') {
+        const p = players.get(clientId);
+        console.log('[net] recv game_update', {
+          clientId,
+          lobbyCode: p ? p.lobbyCode : null,
+          boardRows: Array.isArray(msg.board) ? msg.board.length : 0,
+          ts: Date.now(),
+        });
+      }
+      handleMessage(ws, msg);
     } catch (e) {
       // ignore malformed messages
     }
@@ -302,13 +312,8 @@ function handleMessage(ws, msg) {
   const player = players.get(clientId);
   if (!player) return;
 
-  if (msg.type === 'cheat_activate') {
-    console.log('[cheat] message received', {
-      clientId,
-      hasPlayer: !!player,
-      lobbyCode: player.lobbyCode,
-      msgLobbyCode: msg.lobbyCode || null,
-    });
+  if (msg.type === 'game_update' && !player.lobbyCode && !msg.lobbyCode) {
+    console.log('[net] drop game_update (no lobby)', { clientId, ts: Date.now() });
   }
 
   switch (msg.type) {
@@ -324,6 +329,17 @@ function handleMessage(ws, msg) {
     case 'get_stats':        return sendTo(clientId, { type: 'stats', stats: playerStats.get(clientId) });
     case 'save_settings':    return handleSaveSettings(clientId, msg);
     case 'get_settings':     return sendTo(clientId, { type: 'settings', settings: player.settings });
+  }
+}
+
+function tryAttachLobbyFromMessage(player, clientId, msg) {
+  if (!player || player.lobbyCode || !msg || !msg.lobbyCode) return;
+  const code = String(msg.lobbyCode || '').toUpperCase().trim();
+  const lobby = lobbies.get(code);
+  if (lobby) pruneLobbyPlayers(lobby);
+  if (lobby && lobby.status === 'playing') {
+    player.lobbyCode = code;
+    if (!lobby.players.includes(clientId)) lobby.players.push(clientId);
   }
 }
 
@@ -519,7 +535,21 @@ function startGame(code) {
 
 function handleGameUpdate(clientId, msg) {
   const player = players.get(clientId);
-  if (!player || !player.lobbyCode) return;
+  if (!player) return;
+  if (!player.lobbyCode) {
+    tryAttachLobbyFromMessage(player, clientId, msg);
+  }
+  if (!player.lobbyCode) return;
+
+  console.log('[net] relay game_update', {
+    clientId,
+    lobbyCode: player.lobbyCode,
+    score: msg.score,
+    level: msg.level,
+    lines: msg.lines,
+    boardRows: Array.isArray(msg.board) ? msg.board.length : 0,
+    ts: Date.now(),
+  });
 
   broadcastToLobby(player.lobbyCode, {
     type: 'opponent_update',
@@ -533,7 +563,11 @@ function handleGameUpdate(clientId, msg) {
 
 function handleLinesCleared(clientId, msg) {
   const player = players.get(clientId);
-  if (!player || !player.lobbyCode) return;
+  if (!player) return;
+  if (!player.lobbyCode) {
+    tryAttachLobbyFromMessage(player, clientId, msg);
+  }
+  if (!player.lobbyCode) return;
 
   const lobby = lobbies.get(player.lobbyCode);
   if (!lobby) return;
@@ -555,35 +589,17 @@ function handleCheatActivate(clientId, msg) {
     const code = String(msg.lobbyCode || '').toUpperCase().trim();
     const lobby = lobbies.get(code);
     if (lobby) pruneLobbyPlayers(lobby);
-    console.log('[cheat] reattach check', {
-      clientId,
-      msgLobbyCode: code,
-      lobbyFound: !!lobby,
-      lobbyStatus: lobby ? lobby.status : null,
-      lobbyPlayers: lobby ? lobby.players.length : null,
-    });
     if (lobby && lobby.status === 'playing') {
       player.lobbyCode = code;
       if (!lobby.players.includes(clientId)) lobby.players.push(clientId);
-      console.log('[cheat] lobby reattached', { clientId, lobbyCode: code });
     }
   }
 
   if (!player.lobbyCode) {
-    console.log('[cheat] rejected: no lobby', { clientId, hasPlayer: !!player });
     return;
   }
 
-  console.log('[cheat] activate request', {
-    clientId,
-    lobbyCode: player.lobbyCode,
-    sequenceLen: Array.isArray(msg.sequence) ? msg.sequence.length : null,
-    activations: player.cheatActivations,
-    cheatEnabled: player.settings && player.settings.cheatEnabled !== false,
-  });
-
   if (!player.settings.cheatEnabled) {
-    console.log('[cheat] rejected: disabled in settings');
     return sendTo(clientId, {
       type: 'cheat_invalid',
       reason: 'Cheats are disabled in settings.',
@@ -596,7 +612,6 @@ function handleCheatActivate(clientId, msg) {
   if (!lobby) return;
 
   if (player.cheatActivations >= MAX_CHEAT_USES_PER_GAME) {
-    console.log('[cheat] rejected: limit reached');
     return sendTo(clientId, {
       type: 'cheat_invalid',
       reason: `Cheat limit reached (${MAX_CHEAT_USES_PER_GAME} per game).`,
@@ -608,16 +623,12 @@ function handleCheatActivate(clientId, msg) {
   const expected = player.cheatCode || getCheatSequence(player.cheatActivations, lobby.seed, clientId);
   const isManual = !!msg.manual;
   if (!isManual && JSON.stringify(msg.sequence) !== JSON.stringify(expected)) {
-    console.log('[cheat] rejected: incorrect sequence');
     return sendTo(clientId, {
       type: 'cheat_invalid',
       reason: 'Incorrect sequence.',
       cheatUsesMax: MAX_CHEAT_USES_PER_GAME,
       cheatUsesRemaining: Math.max(0, MAX_CHEAT_USES_PER_GAME - player.cheatActivations),
     });
-  }
-  if (isManual) {
-    console.log('[cheat] manual activation bypassed sequence check');
   }
 
   const activationIndex = player.cheatActivations;
@@ -649,13 +660,14 @@ function handleCheatActivate(clientId, msg) {
     cheatUsesMax: MAX_CHEAT_USES_PER_GAME,
     cheatUsesRemaining: remaining,
   });
-
-  console.log('[cheat] activated', { clientId, remaining, effects });
 }
 
 function handleGameOver(clientId, msg) {
   const player = players.get(clientId);
   if (!player) return;
+  if (!player.lobbyCode) {
+    tryAttachLobbyFromMessage(player, clientId, msg);
+  }
 
   player.gameOver = true;
 
