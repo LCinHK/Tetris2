@@ -327,9 +327,14 @@ describe('Tetris2 Server', () => {
   /* ── Cheat codes ──────────────────────────────────────────────── */
   describe('Cheat codes', () => {
     it('getCheatSequence returns escalating sequences', () => {
-      const seq0 = getCheatSequence(0);
-      const seq1 = getCheatSequence(1);
-      assert.ok(seq1.length >= seq0.length, 'later sequences should be longer or equal');
+      const seq0 = getCheatSequence(0, 12345, 'player_test');
+      const seq1 = getCheatSequence(1, 12345, 'player_test');
+      assert.ok(seq1.length > seq0.length, 'later sequences should be longer');
+
+      // Pattern: every key is pressed twice (pairs)
+      for (let i = 0; i < seq1.length; i += 2) {
+        assert.equal(seq1[i], seq1[i + 1]);
+      }
     });
 
     it('activates cheat with correct sequence', async () => {
@@ -343,8 +348,31 @@ describe('Tetris2 Server', () => {
 
       send(ws, { type: 'cheat_activate', sequence: start.cheatCode });
       const resp = await waitForType(ws, 'cheat_activated');
-      assert.ok(['score_boost', 'opponent_obfuscate'].includes(resp.cheatType));
-      assert.ok(resp.nextCheatCode, 'should provide next cheat code');
+      assert.ok(Array.isArray(resp.effects), 'should include effects array');
+      assert.equal(resp.effects.length, 2, 'should grant exactly 2 effects');
+      assert.ok(Array.isArray(resp.nextCheatCode), 'should provide next cheat code');
+      ws.close();
+    });
+
+    it('limits cheat usage to 5 times per player per game', async () => {
+      const ws = await wsConnect();
+      await nextMessage(ws);
+      await setName(ws, 'Alice');
+      send(ws, { type: 'create_lobby' });
+      await waitForType(ws, 'lobby_created');
+      send(ws, { type: 'player_ready' });
+      const start = await waitForType(ws, 'game_start');
+
+      let seq = start.cheatCode;
+      for (let i = 0; i < 5; i++) {
+        send(ws, { type: 'cheat_activate', sequence: seq });
+        const resp = await waitForType(ws, 'cheat_activated');
+        seq = resp.nextCheatCode;
+      }
+
+      send(ws, { type: 'cheat_activate', sequence: seq });
+      const rejected = await waitForType(ws, 'cheat_invalid');
+      assert.ok(rejected.reason && rejected.reason.toLowerCase().includes('limit'));
       ws.close();
     });
 

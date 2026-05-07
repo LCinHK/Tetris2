@@ -6,14 +6,25 @@ A real-time, two-player competitive Tetris game built entirely with Node.js and 
 
 ## Table of Contents
 
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-- [Running Tests](#running-tests)
-- [Game Modes](#game-modes)
-- [Cheat Codes](#cheat-codes)
-- [WebSocket Message Reference](#websocket-message-reference)
+- [Tetris 2 – Competitive Multiplayer Tetris](#tetris-2--competitive-multiplayer-tetris)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Tech Stack](#tech-stack)
+  - [Project Structure](#project-structure)
+    - [Key modules explained](#key-modules-explained)
+  - [Getting Started](#getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Install \& run](#install--run)
+    - [Configuration](#configuration)
+  - [Running Tests](#running-tests)
+  - [Game Modes](#game-modes)
+  - [Cheat Codes](#cheat-codes)
+    - [Usage rules](#usage-rules)
+    - [Effects](#effects)
+  - [WebSocket Message Reference](#websocket-message-reference)
+    - [Client → Server](#client--server)
+    - [Server → Client](#server--client)
+  - [Known Limitations](#known-limitations)
 
 ---
 
@@ -23,7 +34,7 @@ A real-time, two-player competitive Tetris game built entirely with Node.js and 
 - 🃏 **Three game modes**: Score Attack, Time Attack (3 min), Obstacle (garbage lines)
 - 👻 **Ghost piece**, **hold piece**, **next piece preview**
 - 📊 **Per-session stats**: games played, high score, lines cleared, win/loss record, recent score history
-- 🔑 **Escalating cheat codes** (Konami-style arrow-key sequences) for score boosts or opponent board obfuscation
+- 🔑 **Escalating cheat codes** (Konami-style arrow-key sequences) granting 2 of 3 advantages (score boost / slow drop / garbage pulse)
 - ⚙️ **Persistent settings** (cheat on/off, sound on/off, default game mode) stored per WebSocket session
 - 🛡️ Path-traversal protection on the static file server
 - ✅ Unit-tested server with Node.js built-in test runner (no extra test framework)
@@ -87,6 +98,7 @@ Tetris2/
 - 7-bag random piece generator using a seeded Mulberry32 PRNG (so both players draw identical piece sequences)
 - Full SRS (Super Rotation System) wall-kick tables for all pieces
 - Ghost piece, hold, scoring (with level multiplier and optional 2× score boost)
+- Line-clear base scores: 1 line = 100, 2 = 300, 3 = 500, 4 = 1200 (before level and score boost)
 - `addGarbageLines()` for Obstacle mode; `activateScoreBoost()` for cheat effect
 
 **`public/js/network.js`** — thin WebSocket wrapper loaded on every page:
@@ -152,12 +164,23 @@ Test coverage includes: HTTP static file serving, path-traversal blocking, WebSo
 
 ## Cheat Codes
 
-Cheat codes are optional (toggled in Settings). When enabled, the server sends an arrow-key sequence at game start. Enter it using the arrow keys during gameplay:
+Cheat codes are optional (toggled in Settings). When enabled, the server sends each player a unique key sequence at game start.
 
-- **Even activations** → `score_boost`: doubles scoring for 30 seconds
-- **Odd activations** → `opponent_obfuscate`: obfuscates the opponent's board for 10 seconds
+### Usage rules
 
-Each successful activation unlocks a longer, harder sequence for the next cheat. Up to 5 escalating sequences are defined.
+- **Max 5 activations per player per game**
+- Each activation unlocks a **harder** sequence (more keys)
+- Sequences are **randomised per game** (but deterministic from the game seed)
+- Sequence pattern: **every key must be pressed twice** (e.g. `↑ ↑ 4 4 → → ...`)
+- Keys may include **arrow keys** and (at higher difficulty) **digit keys** (`1`–`9`, top-row — no numpad required)
+
+### Effects
+
+On each successful activation, the player receives **all 3 advantages** (except `garbage_pulse` in solo games):
+
+1) `score_boost` — doubles scoring for 30 seconds
+2) `garbage_pulse` — adds 1 garbage line to the opponent every 5 seconds for 10 seconds (2 lines total)
+3) `slow_drop` — slows the player's block auto-drop for 30 seconds
 
 ---
 
@@ -176,7 +199,7 @@ All messages are JSON objects with a `type` field.
 | `player_ready` | — | Signal ready; game starts when all players ready |
 | `game_update` | `{ board, score, level, lines }` | Broadcast board state to opponent |
 | `lines_cleared` | `{ count, score }` | Notify server of cleared lines (triggers garbage in Obstacle mode) |
-| `cheat_activate` | `{ sequence }` | Submit a cheat-code key sequence |
+| `cheat_activate` | `{ sequence, manual }` | Submit a cheat-code key sequence or manual activation |
 | `game_over` | `{ score, linesCleared, gameMode }` | Report game over |
 | `get_stats` | — | Request current session stats |
 | `save_settings` | `{ settings }` | Persist settings on the server |
@@ -192,12 +215,12 @@ All messages are JSON objects with a `type` field.
 | `lobby_joined` | `code`, `gameMode`, `players` | Joined an existing lobby |
 | `lobby_updated` | `players` | Player list changed |
 | `player_ready` | `playerId`, `players` | A player marked themselves ready |
-| `game_start` | `seed`, `gameMode`, `players`, `cheatCode` | Game begins; `seed` drives the shared RNG |
+| `game_start` | `seed`, `gameMode`, `players`, `cheatCode`, `cheatUsesMax`, `cheatUsesRemaining` | Game begins; `seed` drives the shared RNG |
 | `opponent_update` | `board`, `score`, `level`, `lines` | Opponent's board state |
 | `add_garbage` | `lines` | Add N garbage rows (Obstacle mode) |
 | `opponent_game_over` | `score`, `playerName` | Opponent's game ended |
-| `cheat_activated` | `cheatType`, `duration`, `nextCheatCode` | Cheat accepted |
-| `cheat_invalid` | `reason` | Cheat rejected |
+| `cheat_activated` | `effects`, `duration`, `nextCheatCode`, `cheatUsesMax`, `cheatUsesRemaining` | Cheat accepted; grants all effects (solo skips `garbage_pulse`) |
+| `cheat_invalid` | `reason`, `cheatUsesMax`, `cheatUsesRemaining` | Cheat rejected |
 | `cheat_effect` | `effect`, `duration` | Effect applied to this player (e.g. obfuscate) |
 | `game_over_confirmed` | `stats` | Server confirms game-over and returns updated stats |
 | `stats` | `stats` | Response to `get_stats` |

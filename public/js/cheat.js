@@ -15,6 +15,7 @@
 
   const TRACKED_KEYS = new Set([
     'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+    '1', '2', '3', '4', '5', '6', '7', '8', '9',
   ]);
 
   class CheatManager {
@@ -77,6 +78,7 @@
     _trigger() {
       const seq = [...this._progress];
       this._progress = [];
+      console.log('[cheat] sequence complete, sending activation');
       this.onActivate(seq);
     }
 
@@ -93,6 +95,15 @@
     }
 
     isActive() { return this._active; }
+
+    /* Trigger activation without typing the sequence */
+    triggerManual() {
+      if (!this.enabled || this._active || !this._sequence.length) return false;
+      this._progress = [...this._sequence];
+      this._renderKeys();
+      this._trigger();
+      return true;
+    }
 
     /* ── UI helpers ─────────────────────────────────────────────── */
     _renderKeys() {
