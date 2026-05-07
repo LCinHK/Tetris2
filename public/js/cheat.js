@@ -78,7 +78,6 @@
     _trigger() {
       const seq = [...this._progress];
       this._progress = [];
-      console.log('[cheat] sequence complete, sending activation');
       this.onActivate(seq);
     }
 

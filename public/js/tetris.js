@@ -397,6 +397,7 @@
         start(seed) {
             if (seed !== undefined) this._reset(seed);
             this.isStarted = true;
+            this.onPieceMoved(this._serializeBoardWithActivePiece());
             const now = performance.now();
             this._lastDrop = now;
             this._lastFrameTs = now;
