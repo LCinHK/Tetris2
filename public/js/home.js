@@ -35,8 +35,8 @@
     if (name) playerNameInput.value = name;
 
     const settings = _loadSettings();
-    cheatEnabledCb.checked  = settings.cheatEnabled;
-    soundEnabledCb.checked  = settings.soundEnabled;
+    cheatEnabledCb.checked  = settings.cheatEnabled !== false;
+    soundEnabledCb.checked  = settings.soundEnabled !== false;
     defaultModeSelect.value = settings.gameMode || 'score_attack';
     if (gameModeSelect) gameModeSelect.value = settings.gameMode || 'score_attack';
 
@@ -55,6 +55,27 @@
 
   function _saveStats(stats) {
     localStorage.setItem('stats', JSON.stringify(stats));
+  }
+
+  function _hasLocalStats(stats) {
+    if (!stats || typeof stats !== 'object') return false;
+    return Boolean(
+      stats.gamesPlayed ||
+      stats.highScore ||
+      stats.totalLinesCleared ||
+      stats.wins ||
+      stats.losses ||
+      (Array.isArray(stats.scores) && stats.scores.length)
+    );
+  }
+
+  function _hasLocalSettings(settings) {
+    if (!settings || typeof settings !== 'object') return false;
+    return (
+      Object.prototype.hasOwnProperty.call(settings, 'cheatEnabled') ||
+      Object.prototype.hasOwnProperty.call(settings, 'soundEnabled') ||
+      Object.prototype.hasOwnProperty.call(settings, 'gameMode')
+    );
   }
 
   /* ── Stats display ───────────────────────────────────────────── */
@@ -236,6 +257,11 @@
 
   Network.on('stats', msg => {
     if (msg.stats) {
+      const localStats = _loadStats();
+      if (_hasLocalStats(localStats)) {
+        _renderStats(localStats);
+        return;
+      }
       _saveStats(msg.stats);
       _renderStats(msg.stats);
     }
@@ -243,10 +269,18 @@
 
   Network.on('settings', msg => {
     if (msg.settings) {
+      const localSettings = _loadSettings();
+      if (_hasLocalSettings(localSettings)) return;
       const s = msg.settings;
-      cheatEnabledCb.checked  = s.cheatEnabled !== false;
-      soundEnabledCb.checked  = s.soundEnabled !== false;
-      if (s.gameMode) defaultModeSelect.value = s.gameMode;
+      const merged = {
+        cheatEnabled: s.cheatEnabled !== false,
+        soundEnabled: s.soundEnabled !== false,
+        gameMode: s.gameMode || 'score_attack',
+      };
+      localStorage.setItem('settings', JSON.stringify(merged));
+      cheatEnabledCb.checked  = merged.cheatEnabled;
+      soundEnabledCb.checked  = merged.soundEnabled;
+      defaultModeSelect.value = merged.gameMode;
     }
   });
 
