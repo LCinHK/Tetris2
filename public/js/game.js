@@ -471,7 +471,11 @@
             window.location.href = '/gameover.html';
         };
         Network.on('game_over_confirmed', (msg) => {
-            if (msg.stats) localStorage.setItem('stats', JSON.stringify(msg.stats));
+            if (msg.stats) {
+                const localStats = _loadLocalStats();
+                const merged = _mergeStats(localStats, msg.stats);
+                localStorage.setItem('stats', JSON.stringify(merged));
+            }
             nav();
         });
         // Fallback timeout in case of network issue
@@ -583,6 +587,58 @@
     function _setText(id, val) {
         const el = document.getElementById(id);
         if (el) el.textContent = val;
+    }
+
+    function _loadLocalStats() {
+        try { return JSON.parse(localStorage.getItem('stats') || '{}'); }
+        catch (_) { return {}; }
+    }
+
+    function _mergeStats(localStats, serverStats) {
+        const localScores = Array.isArray(localStats.scores) ? localStats.scores : [];
+        const serverScores = Array.isArray(serverStats.scores) ? serverStats.scores : [];
+
+        const mergedScores = localScores.slice();
+        serverScores.forEach((s) => {
+            const exists = mergedScores.some(ls =>
+                ls.score === s.score &&
+                ls.linesCleared === s.linesCleared &&
+                ls.gameMode === s.gameMode &&
+                ls.date === s.date
+            );
+            if (!exists) mergedScores.push(s);
+        });
+
+        // Keep only the most recent 10 scores by date (or preserve insertion order).
+        mergedScores.sort((a, b) => {
+            const da = a && a.date ? new Date(a.date).getTime() : 0;
+            const db = b && b.date ? new Date(b.date).getTime() : 0;
+            return da - db;
+        });
+        if (mergedScores.length > 10) mergedScores.splice(0, mergedScores.length - 10);
+
+        const highScore = Math.max(
+            Number(localStats.highScore) || 0,
+            Number(serverStats.highScore) || 0,
+            ...mergedScores.map(s => Number(s.score) || 0)
+        );
+
+        return {
+            name: serverStats.name || localStats.name || '',
+            gamesPlayed: Math.max(
+                Number(localStats.gamesPlayed) || 0,
+                Number(serverStats.gamesPlayed) || 0,
+                mergedScores.length
+            ),
+            highScore,
+            totalLinesCleared: Math.max(
+                Number(localStats.totalLinesCleared) || 0,
+                Number(serverStats.totalLinesCleared) || 0
+            ),
+            wins: Math.max(Number(localStats.wins) || 0, Number(serverStats.wins) || 0),
+            losses: Math.max(Number(localStats.losses) || 0, Number(serverStats.losses) || 0),
+            scores: mergedScores,
+        };
     }
 
     /* ── Boot ─────────────────────────────────────────────────────── */
