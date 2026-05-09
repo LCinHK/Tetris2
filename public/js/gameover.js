@@ -38,10 +38,16 @@
   const subtitle = document.getElementById('goSubtitle');
 
   const result = lastGame.result;
+  const hadOpponent = lastGame.hadOpponent === true;
+  const opponent = lastGame.opponent || null;
   const lines  = lastGame.linesCleared || 0;
+
+  const wrapper = document.querySelector('.gameover-wrapper');
+  if (wrapper && !hadOpponent) wrapper.classList.add('no-opponent');
 
   if (title) {
     if      (result === 'win')     title.textContent = '🏆 YOU WIN!';
+    else if (result === 'loss' && hadOpponent) title.textContent = '😵 YOU LOST!';
     else if (result === 'loss')    title.textContent = '💀 GAME OVER';
     else if (result === 'time_up') title.textContent = "⏰ TIME'S UP!";
     else                           title.textContent = 'GAME OVER';
@@ -67,6 +73,15 @@
   _setText('finalLevel', lastGame.level || 1);
   _setText('finalMode',  modeLabels[lastGame.gameMode] || (lastGame.gameMode || '–'));
   _setText('allTimeHigh', (stats.highScore || 0).toLocaleString());
+
+  const opponentCard = document.getElementById('opponentCard');
+  if (hadOpponent && opponent && opponentCard) {
+    opponentCard.classList.remove('hidden');
+    _setText('opponentName', opponent.name || 'Opponent');
+    _setText('opponentScore', (opponent.score || 0).toLocaleString());
+    _setText('opponentLines', opponent.lines || 0);
+    _setText('opponentLevel', opponent.level || 1);
+  }
 
   /* ── Score history table ─────────────────────────────────────── */
   const historyBody = document.getElementById('historyBody');

@@ -153,7 +153,7 @@
             if (left <= 0) {
                 clearInterval(timerInterval);
                 timerInterval = null;
-                endGame();
+                endGame(undefined, undefined, undefined, true);
             }
         }, 250);
     }
@@ -169,6 +169,7 @@
     let _lastPieceMoveSend = 0;
     let _opponentGameOver = false;
     let _gameEnded = false;
+    let _opponentSnapshot = { name: '', score: 0, lines: 0, level: 1 };
 
     const game = new TetrisGame(gameCanvas, {
         cellSize: 30,
@@ -226,7 +227,7 @@
             });
         },
         onGameOver({ score, lines, level }) {
-            endGame(score, lines, level);
+            endGame(score, lines, level, false);
         },
     });
 
@@ -367,6 +368,10 @@
 
     function togglePause() {
         if (game.isGameOver) return;
+        if (!isSolo) {
+            notify('Pause is disabled in multiplayer.', 'error');
+            return;
+        }
         const paused = game.togglePause();
         paused ? pauseBgm() : resumeBgm();
         if (pauseOverlay) {
@@ -423,9 +428,14 @@
     }
 
     /* ── End game ────────────────────────────────────────────────── */
-    function endGame(score, lines, level) {
+    function endGame(score, lines, level, isTimeUp) {
         if (_gameEnded) return;
         _gameEnded = true;
+
+        if (!game.isGameOver) {
+            game.isGameOver = true;
+            game.pause();
+        }
 
         clearInterval(timerInterval);
         timerInterval = null;
@@ -439,10 +449,14 @@
         // Determine match outcome for the game-over page
         let result;
         if (isSolo) {
-            result = gameMode === 'time_attack' ? 'time_up' : 'solo';
+            if (gameMode === 'time_attack' && isTimeUp) {
+                result = 'time_up';
+            } else {
+                result = 'solo';
+            }
         } else if (_opponentGameOver) {
             result = 'win';
-        } else if (gameMode === 'time_attack') {
+        } else if (gameMode === 'time_attack' && isTimeUp) {
             result = 'time_up';
         } else {
             result = 'loss';
@@ -463,6 +477,8 @@
             level: finalLevel,
             gameMode,
             result,
+            hadOpponent: !isSolo,
+            opponent: !isSolo ? _opponentSnapshot : null,
         }));
 
         // Wait for server to confirm with full stats, then navigate
@@ -471,7 +487,11 @@
             window.location.href = '/gameover.html';
         };
         Network.on('game_over_confirmed', (msg) => {
-            if (msg.stats) localStorage.setItem('stats', JSON.stringify(msg.stats));
+            if (msg.stats) {
+                const localStats = _loadLocalStats();
+                const merged = _mergeStats(localStats, msg.stats);
+                localStorage.setItem('stats', JSON.stringify(merged));
+            }
             nav();
         });
         // Fallback timeout in case of network issue
@@ -497,6 +517,13 @@
             _setText('opponentLevel', msg.level || 1);
             _setText('opponentLines', msg.lines || 0);
         }
+
+            _opponentSnapshot = {
+                name: msg.playerName || _opponentSnapshot.name || 'Opponent',
+                score: Number(msg.score) || 0,
+                lines: Number(msg.lines) || 0,
+                level: Number(msg.level) || 1,
+            };
     });
 
     Network.on('opponent_game_over', (msg) => {
@@ -504,6 +531,13 @@
         const overlay = document.getElementById('opponentOverlay');
         if (overlay) overlay.classList.remove('hidden');
         notify(`Opponent finished with ${(msg.score || 0).toLocaleString()} pts! You win!`, 'success');
+        _opponentSnapshot = {
+            name: msg.playerName || _opponentSnapshot.name || 'Opponent',
+            score: Number(msg.score) || _opponentSnapshot.score || 0,
+            lines: _opponentSnapshot.lines || 0,
+            level: _opponentSnapshot.level || 1,
+        };
+        endGame(game.score, game.lines, game.level, false);
     });
 
     Network.on('add_garbage', (msg) => {
@@ -583,6 +617,58 @@
     function _setText(id, val) {
         const el = document.getElementById(id);
         if (el) el.textContent = val;
+    }
+
+    function _loadLocalStats() {
+        try { return JSON.parse(localStorage.getItem('stats') || '{}'); }
+        catch (_) { return {}; }
+    }
+
+    function _mergeStats(localStats, serverStats) {
+        const localScores = Array.isArray(localStats.scores) ? localStats.scores : [];
+        const serverScores = Array.isArray(serverStats.scores) ? serverStats.scores : [];
+
+        const mergedScores = localScores.slice();
+        serverScores.forEach((s) => {
+            const exists = mergedScores.some(ls =>
+                ls.score === s.score &&
+                ls.linesCleared === s.linesCleared &&
+                ls.gameMode === s.gameMode &&
+                ls.date === s.date
+            );
+            if (!exists) mergedScores.push(s);
+        });
+
+        // Keep only the most recent 10 scores by date (or preserve insertion order).
+        mergedScores.sort((a, b) => {
+            const da = a && a.date ? new Date(a.date).getTime() : 0;
+            const db = b && b.date ? new Date(b.date).getTime() : 0;
+            return da - db;
+        });
+        if (mergedScores.length > 10) mergedScores.splice(0, mergedScores.length - 10);
+
+        const highScore = Math.max(
+            Number(localStats.highScore) || 0,
+            Number(serverStats.highScore) || 0,
+            ...mergedScores.map(s => Number(s.score) || 0)
+        );
+
+        return {
+            name: serverStats.name || localStats.name || '',
+            gamesPlayed: Math.max(
+                Number(localStats.gamesPlayed) || 0,
+                Number(serverStats.gamesPlayed) || 0,
+                mergedScores.length
+            ),
+            highScore,
+            totalLinesCleared: Math.max(
+                Number(localStats.totalLinesCleared) || 0,
+                Number(serverStats.totalLinesCleared) || 0
+            ),
+            wins: Math.max(Number(localStats.wins) || 0, Number(serverStats.wins) || 0),
+            losses: Math.max(Number(localStats.losses) || 0, Number(serverStats.losses) || 0),
+            scores: mergedScores,
+        };
     }
 
     /* ── Boot ─────────────────────────────────────────────────────── */
