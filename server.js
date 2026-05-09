@@ -698,9 +698,6 @@ function handleGameOver(clientId, msg) {
             if (stats) stats.losses++;
           }
           sendTo(cid, { type: 'opponent_game_over', score: msg.score || 0, playerName: player.name });
-          if (oppStats) {
-            sendTo(cid, { type: 'stats', stats: oppStats });
-          }
         }
       });
 
