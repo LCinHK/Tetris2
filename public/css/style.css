@@ -383,7 +383,7 @@ canvas#gameCanvas.obfuscated { filter: blur(6px) brightness(.5); }
 ═══════════════════════════════════════════════════════════════════ */
 
 .gameover-wrapper {
-  max-width: 560px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 3rem 1rem;
   text-align: center;
@@ -397,12 +397,27 @@ canvas#gameCanvas.obfuscated { filter: blur(6px) brightness(.5); }
 }
 .gameover-subtitle { color: var(--text-dim); margin-bottom: 2rem; }
 
+.score-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.2rem;
+  align-items: stretch;
+  margin-bottom: 1.5rem;
+}
+
+.gameover-wrapper.no-opponent {
+  max-width: 450px;
+}
+
+.gameover-wrapper.no-opponent .score-cards-grid {
+  grid-template-columns: 1fr;
+}
+
 .score-card {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1.5rem;
-  margin-bottom: 1.5rem;
 }
 .score-big {
   font-size: 3.5rem;
@@ -454,4 +469,5 @@ canvas#gameCanvas.obfuscated { filter: blur(6px) brightness(.5); }
   .home-header h1 { font-size: 2.5rem; }
   .boards-area    { gap: .75rem; }
   .side-panel     { width: 110px; }
+  .score-cards-grid { grid-template-columns: 1fr; }
 }

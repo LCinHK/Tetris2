@@ -169,6 +169,7 @@
     let _lastPieceMoveSend = 0;
     let _opponentGameOver = false;
     let _gameEnded = false;
+    let _opponentSnapshot = { name: '', score: 0, lines: 0, level: 1 };
 
     const game = new TetrisGame(gameCanvas, {
         cellSize: 30,
@@ -477,6 +478,7 @@
             gameMode,
             result,
             hadOpponent: !isSolo,
+            opponent: !isSolo ? _opponentSnapshot : null,
         }));
 
         // Wait for server to confirm with full stats, then navigate
@@ -515,6 +517,13 @@
             _setText('opponentLevel', msg.level || 1);
             _setText('opponentLines', msg.lines || 0);
         }
+
+            _opponentSnapshot = {
+                name: msg.playerName || _opponentSnapshot.name || 'Opponent',
+                score: Number(msg.score) || 0,
+                lines: Number(msg.lines) || 0,
+                level: Number(msg.level) || 1,
+            };
     });
 
     Network.on('opponent_game_over', (msg) => {
@@ -522,6 +531,12 @@
         const overlay = document.getElementById('opponentOverlay');
         if (overlay) overlay.classList.remove('hidden');
         notify(`Opponent finished with ${(msg.score || 0).toLocaleString()} pts! You win!`, 'success');
+        _opponentSnapshot = {
+            name: msg.playerName || _opponentSnapshot.name || 'Opponent',
+            score: Number(msg.score) || _opponentSnapshot.score || 0,
+            lines: _opponentSnapshot.lines || 0,
+            level: _opponentSnapshot.level || 1,
+        };
         endGame(game.score, game.lines, game.level, false);
     });
 

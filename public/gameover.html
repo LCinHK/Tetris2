@@ -12,17 +12,31 @@
     <h1 class="gameover-title" id="goTitle">GAME OVER</h1>
     <p class="gameover-subtitle" id="goSubtitle">Here's how you did</p>
 
-    <!-- Main score card -->
-    <div class="score-card">
-      <div class="score-label">FINAL SCORE</div>
-      <div class="score-big" id="finalScore">0</div>
+    <div class="score-cards-grid">
+      <!-- Main score card -->
+      <div class="score-card">
+        <div class="score-label">FINAL SCORE</div>
+        <div class="score-big" id="finalScore">0</div>
 
-      <dl class="stats-grid" id="statsGrid">
-        <dt>Lines Cleared</dt> <dd id="finalLines">0</dd>
-        <dt>Level Reached</dt> <dd id="finalLevel">1</dd>
-        <dt>Game Mode</dt>     <dd id="finalMode">–</dd>
-        <dt>Highest Score</dt>    <dd id="allTimeHigh">0</dd>
-      </dl>
+        <dl class="stats-grid" id="statsGrid">
+          <dt>Lines Cleared</dt> <dd id="finalLines">0</dd>
+          <dt>Level Reached</dt> <dd id="finalLevel">1</dd>
+          <dt>Game Mode</dt>     <dd id="finalMode">–</dd>
+          <dt>Highest Score</dt>    <dd id="allTimeHigh">0</dd>
+        </dl>
+      </div>
+
+      <!-- Main score card (multiplayer only) -->
+      <div class="score-card hidden" id="opponentCard">
+        <div class="score-label">OPPONENT'S SCORE</div>
+        <div class="score-big" id="opponentScore">0</div>
+
+        <dl class="stats-grid">
+          <dt>Opponent's Name</dt> <dd id="opponentName">Opponent</dd>
+          <dt>Opponent's Lines Cleared</dt> <dd id="opponentLines">0</dd>
+          <dt>Opponent's Level Reached</dt> <dd id="opponentLevel">1</dd>
+        </dl>
+      </div>
     </div>
 
     <!-- Score history -->
