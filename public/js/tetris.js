@@ -49,7 +49,7 @@
 
     /* Drop-speed table: interval in ms per level (1–20+) */
     function dropInterval(level) {
-        const speeds = [800, 717, 633, 550, 467, 383, 300, 217, 133, 100, 83, 83, 83, 67, 67, 67, 50, 50, 50, 33, 33];
+        const speeds = [800, 600, 450, 340, 260, 200, 160, 130, 105, 85, 70, 60, 50, 45, 40, 35, 30, 27, 24, 22, 20];
         return speeds[Math.min(level - 1, speeds.length - 1)];
     }
 
