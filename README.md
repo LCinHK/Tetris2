@@ -9,6 +9,7 @@ A real-time, two-player competitive Tetris game built entirely with Node.js and 
 - [Tetris 2 – Competitive Multiplayer Tetris](#tetris-2--competitive-multiplayer-tetris)
   - [Table of Contents](#table-of-contents)
   - [Features](#features)
+    - [Known missing / partial implementations](#known-missing--partial-implementations)
   - [Tech Stack](#tech-stack)
   - [Project Structure](#project-structure)
     - [Key modules explained](#key-modules-explained)
@@ -18,6 +19,7 @@ A real-time, two-player competitive Tetris game built entirely with Node.js and 
     - [Configuration](#configuration)
   - [Running Tests](#running-tests)
   - [Game Modes](#game-modes)
+  - [How to Play](#how-to-play)
   - [Cheat Codes](#cheat-codes)
     - [Usage rules](#usage-rules)
     - [Effects](#effects)
@@ -165,6 +167,29 @@ Test coverage includes: HTTP static file serving, path-traversal blocking, WebSo
 | **Score Attack** | Classic — highest score when the game ends wins |
 | **Time Attack** | 3-minute timer — most points when time runs out wins |
 | **Obstacle** | Clearing lines sends garbage rows to your opponent (clearing N lines sends N−1 garbage rows) |
+
+---
+
+## How to Play
+
+**Goal**: Clear lines to score points and outlast your opponent. Every 10 lines raises your level and increases the drop speed.
+
+**Controls**
+
+| Key | Action |
+|---|---|
+| Left / Right | Move piece |
+| Up | Rotate |
+| Down | Soft drop |
+| Space | Hard drop |
+| C | Hold piece |
+| P | Pause / resume |
+
+**Win conditions**
+
+- **Score Attack**: Highest score wins when a player tops out.
+- **Time Attack**: Highest score wins when the 3-minute timer ends.
+- **Obstacle**: Same scoring rules as Score Attack, with garbage-line attacks enabled.
 
 ---
 
