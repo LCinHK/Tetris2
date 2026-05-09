@@ -13,13 +13,14 @@
   try { stats    = JSON.parse(localStorage.getItem('stats')    || '{}'); } catch (_) {}
   try { settings = JSON.parse(localStorage.getItem('settings') || '{}'); } catch (_) {}
 
-  // One-time trigger from previous page: play gameover sound when requested.
+  // One-time trigger from previous page: play win/gameover sound when requested.
   const soundEnabled = settings.soundEnabled !== false;
   if (sessionStorage.getItem('playGameOver') === 'true') {
     sessionStorage.removeItem('playGameOver');
     if (soundEnabled) {
       try {
-        const gameOverSound = new Audio('/audio/gameover.mp3');
+        const soundSrc = (lastGame.result === 'win') ? '/audio/win.mp3' : '/audio/gameover.mp3';
+        const gameOverSound = new Audio(soundSrc);
         gameOverSound.currentTime = 0;
         void gameOverSound.play().catch(() => {});
       } catch (_) { /* ignore playback errors */ }
