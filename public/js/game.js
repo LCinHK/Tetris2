@@ -476,6 +476,7 @@
             level: finalLevel,
             gameMode,
             result,
+            hadOpponent: !isSolo,
         }));
 
         // Wait for server to confirm with full stats, then navigate

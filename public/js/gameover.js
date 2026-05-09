@@ -38,10 +38,12 @@
   const subtitle = document.getElementById('goSubtitle');
 
   const result = lastGame.result;
+  const hadOpponent = lastGame.hadOpponent === true;
   const lines  = lastGame.linesCleared || 0;
 
   if (title) {
     if      (result === 'win')     title.textContent = '🏆 YOU WIN!';
+    else if (result === 'loss' && hadOpponent) title.textContent = '😵 YOU LOST!';
     else if (result === 'loss')    title.textContent = '💀 GAME OVER';
     else if (result === 'time_up') title.textContent = "⏰ TIME'S UP!";
     else                           title.textContent = 'GAME OVER';
