@@ -367,6 +367,10 @@
 
     function togglePause() {
         if (game.isGameOver) return;
+        if (!isSolo) {
+            notify('Pause is disabled in multiplayer.', 'error');
+            return;
+        }
         const paused = game.togglePause();
         paused ? pauseBgm() : resumeBgm();
         if (pauseOverlay) {
