@@ -153,7 +153,7 @@
             if (left <= 0) {
                 clearInterval(timerInterval);
                 timerInterval = null;
-                endGame();
+                endGame(undefined, undefined, undefined, true);
             }
         }, 250);
     }
@@ -226,7 +226,7 @@
             });
         },
         onGameOver({ score, lines, level }) {
-            endGame(score, lines, level);
+            endGame(score, lines, level, false);
         },
     });
 
@@ -423,9 +423,14 @@
     }
 
     /* ── End game ────────────────────────────────────────────────── */
-    function endGame(score, lines, level) {
+    function endGame(score, lines, level, isTimeUp) {
         if (_gameEnded) return;
         _gameEnded = true;
+
+        if (!game.isGameOver) {
+            game.isGameOver = true;
+            game.pause();
+        }
 
         clearInterval(timerInterval);
         timerInterval = null;
@@ -439,10 +444,14 @@
         // Determine match outcome for the game-over page
         let result;
         if (isSolo) {
-            result = gameMode === 'time_attack' ? 'time_up' : 'solo';
+            if (gameMode === 'time_attack' && isTimeUp) {
+                result = 'time_up';
+            } else {
+                result = 'solo';
+            }
         } else if (_opponentGameOver) {
             result = 'win';
-        } else if (gameMode === 'time_attack') {
+        } else if (gameMode === 'time_attack' && isTimeUp) {
             result = 'time_up';
         } else {
             result = 'loss';
@@ -508,6 +517,7 @@
         const overlay = document.getElementById('opponentOverlay');
         if (overlay) overlay.classList.remove('hidden');
         notify(`Opponent finished with ${(msg.score || 0).toLocaleString()} pts! You win!`, 'success');
+        endGame(game.score, game.lines, game.level, false);
     });
 
     Network.on('add_garbage', (msg) => {
