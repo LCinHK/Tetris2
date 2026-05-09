@@ -426,6 +426,7 @@
     function endGame(score, lines, level) {
         if (_gameEnded) return;
         _gameEnded = true;
+        game.isGameOver = true;
 
         clearInterval(timerInterval);
         timerInterval = null;
@@ -504,6 +505,14 @@
         const overlay = document.getElementById('opponentOverlay');
         if (overlay) overlay.classList.remove('hidden');
         notify(`Opponent finished with ${(msg.score || 0).toLocaleString()} pts! You win!`, 'success');
+        Network.send({ type: 'get_stats' });
+        endGame();
+    });
+
+    Network.on('stats', (msg) => {
+        if (msg && msg.stats) {
+            localStorage.setItem('stats', JSON.stringify(msg.stats));
+        }
     });
 
     Network.on('add_garbage', (msg) => {
