@@ -112,7 +112,7 @@ Tetris2/
 **`public/js/network.js`** — thin WebSocket wrapper loaded on every page:
 - Connects to the server over `ws://` or `wss://` depending on the page protocol
 - Provides `Network.on(type, fn)` / `Network.send(obj)` event-bus API
-- Restores the player's last-used name from `localStorage`
+- Restores the player's last-used name from `localStorage` (persisted across browser sessions); a per-tab override is available via `sessionStorage`.
 
 ---
 

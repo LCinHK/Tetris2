@@ -10,7 +10,8 @@
     ws: null,
     _handlers: {},
     clientId: null,
-    playerName: localStorage.getItem('playerName') || '',
+    // Prefer per-tab session override, otherwise restore persistent name from localStorage
+    playerName: sessionStorage.getItem('playerName') || localStorage.getItem('playerName') || '',
 
     connect() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';

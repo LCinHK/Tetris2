@@ -1,6 +1,6 @@
 /**
  * gameover.js – Game Over page logic
- * Reads results from localStorage and renders the game over screen.
+ * Reads results from sessionStorage and renders the game over screen.
  */
 (function () {
   'use strict';
@@ -9,9 +9,9 @@
   let lastGame = {};
   let stats    = {};
   let settings = {};
-  try { lastGame = JSON.parse(localStorage.getItem('lastGame') || '{}'); } catch (_) {}
-  try { stats    = JSON.parse(localStorage.getItem('stats')    || '{}'); } catch (_) {}
-  try { settings = JSON.parse(localStorage.getItem('settings') || '{}'); } catch (_) {}
+  try { lastGame = JSON.parse(sessionStorage.getItem('lastGame') || '{}'); } catch (_) {}
+  try { stats    = JSON.parse(sessionStorage.getItem('stats')    || '{}'); } catch (_) {}
+  try { settings = JSON.parse(sessionStorage.getItem('settings') || '{}'); } catch (_) {}
 
   // One-time trigger from previous page: play win/gameover sound when requested.
   const soundEnabled = settings.soundEnabled !== false;
@@ -185,7 +185,7 @@
 
   function startSoloGame() {
     const mode = lastGame.gameMode || settings.gameMode || 'score_attack';
-    localStorage.setItem('currentGame', JSON.stringify({
+    sessionStorage.setItem('currentGame', JSON.stringify({
       gameMode: mode,
     }));
     window.location.href = '/game.html';
@@ -193,7 +193,7 @@
 
   function startNetworkGame(msg) {
     if (!msg) return;
-    localStorage.setItem('currentGame', JSON.stringify({
+    sessionStorage.setItem('currentGame', JSON.stringify({
       lobbyCode: msg.lobbyCode || lastGame.lobbyCode || null,
       gameMode: msg.gameMode || lastGame.gameMode || 'score_attack',
       seed: msg.seed,

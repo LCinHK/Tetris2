@@ -32,7 +32,7 @@
 
   /* ── Restore persisted state ─────────────────────────────────── */
   function restoreState() {
-    const name = localStorage.getItem('playerName') || '';
+    const name = sessionStorage.getItem('playerName') || localStorage.getItem('playerName') || '';
     if (name) playerNameInput.value = name;
 
     const settings = _loadSettings();
@@ -46,17 +46,17 @@
   }
 
   function _loadSettings() {
-    try { return JSON.parse(localStorage.getItem('settings') || '{}'); }
+    try { return JSON.parse(sessionStorage.getItem('settings') || '{}'); }
     catch (_) { return {}; }
   }
 
   function _loadStats() {
-    try { return JSON.parse(localStorage.getItem('stats') || '{}'); }
+    try { return JSON.parse(sessionStorage.getItem('stats') || '{}'); }
     catch (_) { return {}; }
   }
 
   function _saveStats(stats) {
-    localStorage.setItem('stats', JSON.stringify(stats));
+    sessionStorage.setItem('stats', JSON.stringify(stats));
   }
 
   function _hasLocalStats(stats) {
@@ -153,7 +153,9 @@
     const name = playerNameInput.value.trim();
     if (!name) return notify('Please enter a name.', 'error');
     Network.playerName = name;
+    // Persist across tabs and sessions, but also keep a per-tab override
     localStorage.setItem('playerName', name);
+    sessionStorage.setItem('playerName', name);
     Network.send({ type: 'set_name', name });
     notify(`Name set to "${name}"`, 'success');
   });
@@ -195,7 +197,7 @@
       soundEnabled: soundEnabledCb.checked,
       gameMode:     _normalizeMode(defaultModeSelect.value),
     };
-    localStorage.setItem('settings', JSON.stringify(settings));
+    sessionStorage.setItem('settings', JSON.stringify(settings));
     Network.send({ type: 'save_settings', settings });
     if (gameModeSelect) gameModeSelect.value = _normalizeMode(settings.gameMode);
     notify('Settings saved.', 'success');
@@ -210,13 +212,17 @@
 
   /* ── WebSocket handlers ──────────────────────────────────────── */
   Network.on('open', () => {
-    // Request stats and settings from server (or use localStorage fallback)
+    // Request stats and settings from server (or use sessionStorage fallback)
     Network.send({ type: 'get_stats' });
     Network.send({ type: 'get_settings' });
   });
 
   Network.on('name_set', msg => {
-    localStorage.setItem('playerName', msg.name);
+    // Update both persistent and per-tab storage so changes are applied immediately
+    if (msg && msg.name) {
+      localStorage.setItem('playerName', msg.name);
+      sessionStorage.setItem('playerName', msg.name);
+    }
   });
 
   Network.on('lobby_created', msg => {
@@ -241,7 +247,7 @@
 
   Network.on('game_start', msg => {
     // Persist lobby info for game page
-    localStorage.setItem('currentGame', JSON.stringify({
+    sessionStorage.setItem('currentGame', JSON.stringify({
       lobbyCode: currentLobbyCode,
       gameMode:  msg.gameMode,
       seed:      msg.seed,
@@ -251,7 +257,7 @@
       cheatUsesRemaining: msg.cheatUsesRemaining,
     }));
     const settings = _loadSettings();
-    localStorage.setItem('settings', JSON.stringify(
+    sessionStorage.setItem('settings', JSON.stringify(
       Object.assign(settings, { cheatEnabled: cheatEnabledCb.checked, soundEnabled: soundEnabledCb.checked })
     ));
     window.location.href = '/game.html';
@@ -279,7 +285,7 @@
         soundEnabled: s.soundEnabled !== false,
         gameMode: _normalizeMode(s.gameMode),
       };
-      localStorage.setItem('settings', JSON.stringify(merged));
+      sessionStorage.setItem('settings', JSON.stringify(merged));
       cheatEnabledCb.checked  = merged.cheatEnabled;
       soundEnabledCb.checked  = merged.soundEnabled;
       defaultModeSelect.value = merged.gameMode;

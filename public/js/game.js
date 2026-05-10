@@ -5,12 +5,12 @@
 (function () {
     'use strict';
 
-    /* ── Read game config from localStorage ─────────────────────── */
+    /* ── Read game config from sessionStorage ───────────────────── */
     let gameConfig = {};
-    try { gameConfig = JSON.parse(localStorage.getItem('currentGame') || '{}'); } catch (_) { }
+    try { gameConfig = JSON.parse(sessionStorage.getItem('currentGame') || '{}'); } catch (_) { }
 
     let settings = {};
-    try { settings = JSON.parse(localStorage.getItem('settings') || '{}'); } catch (_) { }
+    try { settings = JSON.parse(sessionStorage.getItem('settings') || '{}'); } catch (_) { }
 
     const gameMode = gameConfig.gameMode || 'score_attack';
     const isSolo = !gameConfig.players || gameConfig.players.length < 2;
@@ -491,7 +491,7 @@
             lobbyCode: gameConfig.lobbyCode || null,
         });
 
-        localStorage.setItem('lastGame', JSON.stringify({
+        sessionStorage.setItem('lastGame', JSON.stringify({
             score: finalScore,
             linesCleared: finalLines,
             level: finalLevel,
@@ -511,7 +511,7 @@
             if (msg.stats) {
                 const localStats = _loadLocalStats();
                 const merged = _mergeStats(localStats, msg.stats);
-                localStorage.setItem('stats', JSON.stringify(merged));
+                sessionStorage.setItem('stats', JSON.stringify(merged));
             }
             nav();
         });
@@ -599,7 +599,7 @@
     }
 
     function _loadLocalStats() {
-        try { return JSON.parse(localStorage.getItem('stats') || '{}'); }
+        try { return JSON.parse(sessionStorage.getItem('stats') || '{}'); }
         catch (_) { return {}; }
     }
 
