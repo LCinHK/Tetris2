@@ -121,7 +121,7 @@
     const cheatTimerDisplay = document.getElementById('cheatTimerDisplay');
 
     /* ── Mode badge ──────────────────────────────────────────────── */
-    const modeLabels = { score_attack: 'Score Attack', time_attack: 'Time Attack', obstacle: 'Obstacle' };
+    const modeLabels = { score_attack: 'Score Attack', time_attack: 'Time Attack' };
     if (modeBadge) modeBadge.textContent = modeLabels[gameMode] || gameMode;
 
     /* ── Show opponent area if multiplayer ───────────────────────── */
@@ -186,12 +186,6 @@
         },
         onLinesCleared({ count, score }) {
             playClearSound();
-            Network.send({
-                type: 'lines_cleared',
-                count,
-                score,
-                lobbyCode: gameConfig.lobbyCode || null,
-            });
         },
         onBoardUpdate(board) {
             // Always send after a piece locks (board state finalised)
@@ -210,13 +204,6 @@
             const now = Date.now();
             if (now - _lastPieceMoveSend < 50) return;
             _lastPieceMoveSend = now;
-            console.log('[net] send game_update', {
-                ts: now,
-                score: game.score,
-                level: game.level,
-                lines: game.lines,
-                boardRows: Array.isArray(board) ? board.length : 0,
-            });
             Network.send({
                 type: 'game_update',
                 board,
@@ -478,6 +465,7 @@
             gameMode,
             result,
             hadOpponent: !isSolo,
+            lobbyCode: gameConfig.lobbyCode || null,
             opponent: !isSolo ? _opponentSnapshot : null,
         }));
 
@@ -500,14 +488,6 @@
 
     /* ── Network events ──────────────────────────────────────────── */
     Network.on('opponent_update', (msg) => {
-        console.log('[net] recv opponent_update', {
-            ts: Date.now(),
-            score: msg.score,
-            level: msg.level,
-            lines: msg.lines,
-            playerName: msg.playerName,
-            boardRows: Array.isArray(msg.board) ? msg.board.length : 0,
-        });
         if (opponentArea && !opponentArea.classList.contains('hidden')) {
             if (msg.playerName && opponentLabel) {
                 opponentLabel.textContent = msg.playerName.toUpperCase();
@@ -540,13 +520,6 @@
         endGame(game.score, game.lines, game.level, false);
     });
 
-    Network.on('add_garbage', (msg) => {
-        if (msg.lines > 0) {
-            game.addGarbageLines(msg.lines);
-            notify(`+${msg.lines} garbage line${msg.lines > 1 ? 's' : ''}!`, 'error');
-        }
-    });
-
     Network.on('cheat_activated', (msg) => {
         cheat.markActive(msg.duration || 30000);
 
@@ -562,8 +535,6 @@
             } else if (eff.type === 'slow_drop') {
                 game.activateSlowDrop(eff.duration || 30000, eff.multiplier || 1.7);
                 effectLabels.push('Slow Drop');
-            } else if (eff.type === 'garbage_pulse') {
-                if (!isSolo) effectLabels.push('Garbage Pulse');
             } else if (eff.type === 'opponent_obfuscate') {
                 effectLabels.push('Opponent Obfuscate');
             }

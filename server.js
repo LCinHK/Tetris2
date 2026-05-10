@@ -25,16 +25,16 @@ let clientIdCounter = 0;
    - Pattern: each key is pressed twice (pairs)
    - Escalating difficulty after each activation
    - Limited to 5 activations per player per game
-    - Each activation grants all advantages (garbage pulse only if opponent present):
-       1) score boost (2× scoring for 30s)
-       2) add garbage line to opponent every 5s for 10s (2 lines)
-       3) slow drop speed for player for 30s
+    - Each activation grants all advantages:
+      1) score boost (2× scoring for 30s)
+      2) slow drop speed for player for 30s
 ───────────────────────────────────────── */
 
 const MAX_CHEAT_USES_PER_GAME = 5;
 
 const CHEAT_KEYS_ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 const CHEAT_KEYS_DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const VALID_GAME_MODES = new Set(['score_attack', 'time_attack']);
 
 function fnv1a32(input) {
   let hash = 0x811c9dc5;
@@ -83,41 +83,17 @@ function getCheatSequence(activationCount, gameSeed = 0, clientId = '') {
   return seq;
 }
 
-function _pickAllEffects({ lobby, clientId}) {
-  const player = players.get(clientId);
-  const hasOpponent = lobby && Number(lobby.startPlayersCount || 0) > 1;
-
+function _pickAllEffects() {
   const effects = [
     { type: 'score_boost', duration: 30000 },
     { type: 'slow_drop', duration: 30000, multiplier: 1.7 },
   ];
-  if (hasOpponent) {
-    effects.push({ type: 'garbage_pulse', duration: 10000, intervalMs: 5000, linesPerTick: 1, ticks: 2 });
-  }
 
   return effects;
 }
 
-function _scheduleGarbagePulse(lobbyCode, fromClientId, { ticks = 2, intervalMs = 5000, linesPerTick = 1 } = {}) {
-  const lobby = lobbies.get(lobbyCode);
-  if (!lobby) return;
-
-  for (let i = 0; i < ticks; i++) {
-    setTimeout(() => {
-      const currentLobby = lobbies.get(lobbyCode);
-      if (!currentLobby || currentLobby.status !== 'playing') return;
-
-      const targets = currentLobby.players.filter(id => id !== fromClientId);
-      if (targets.length === 0) return;
-
-      // Only apply if the opponent is still in-game.
-      targets.forEach(tid => {
-        const t = players.get(tid);
-        if (!t || t.gameOver) return;
-        sendTo(tid, { type: 'add_garbage', lines: linesPerTick });
-      });
-    }, i * intervalMs);
-  }
+function normalizeGameMode(mode) {
+  return VALID_GAME_MODES.has(mode) ? mode : 'score_attack';
 }
 
 /* ─────────────────────────────────────────
@@ -174,6 +150,16 @@ function isNameTakenInLobby(lobby, name, excludeId = null) {
     const p = players.get(cid);
     return p && normalizePlayerName(p.name) === target;
   });
+}
+
+function findPlayerIdByName(name, excludeId = null) {
+  const target = normalizePlayerName(name);
+  if (!target) return null;
+  for (const [id, p] of players.entries()) {
+    if (id === excludeId) continue;
+    if (p && normalizePlayerName(p.name) === target) return id;
+  }
+  return null;
 }
 
 /* ─────────────────────────────────────────
@@ -280,15 +266,6 @@ wss.on('connection', (ws) => {
   ws.on('message', (raw) => {
     try {
       const msg = JSON.parse(raw);
-      if (msg && msg.type === 'game_update') {
-        const p = players.get(clientId);
-        console.log('[net] recv game_update', {
-          clientId,
-          lobbyCode: p ? p.lobbyCode : null,
-          boardRows: Array.isArray(msg.board) ? msg.board.length : 0,
-          ts: Date.now(),
-        });
-      }
       handleMessage(ws, msg);
     } catch (e) {
       // ignore malformed messages
@@ -313,7 +290,7 @@ function handleMessage(ws, msg) {
   if (!player) return;
 
   if (msg.type === 'game_update' && !player.lobbyCode && !msg.lobbyCode) {
-    console.log('[net] drop game_update (no lobby)', { clientId, ts: Date.now() });
+    // No lobby to attach to; ignore game updates until we can reattach.
   }
 
   switch (msg.type) {
@@ -322,8 +299,9 @@ function handleMessage(ws, msg) {
     case 'join_lobby':       return handleJoinLobby(clientId, msg);
     case 'leave_lobby':      return handleLeaveLobby(clientId);
     case 'player_ready':     return handlePlayerReady(clientId);
+    case 'rematch_request':  return handleRematchRequest(clientId, msg);
+    case 'rematch_response': return handleRematchResponse(clientId, msg);
     case 'game_update':      return handleGameUpdate(clientId, msg);
-    case 'lines_cleared':    return handleLinesCleared(clientId, msg);
     case 'cheat_activate':   return handleCheatActivate(clientId, msg);
     case 'game_over':        return handleGameOver(clientId, msg);
     case 'get_stats':        return sendTo(clientId, { type: 'stats', stats: playerStats.get(clientId) });
@@ -393,7 +371,7 @@ function handleCreateLobby(clientId, msg) {
   let code;
   do { code = generateLobbyCode(); } while (lobbies.has(code));
 
-  const gameMode = msg.gameMode || 'score_attack';
+  const gameMode = normalizeGameMode(msg.gameMode);
   lobbies.set(code, {
     code,
     host: clientId,
@@ -462,7 +440,7 @@ function leaveLobby(clientId, code) {
   pruneLobbyPlayers(lobby);
 
   if (lobby.players.length === 0) {
-    if (lobby.status !== 'playing') {
+    if (lobby.status === 'waiting') {
       lobbies.delete(code);
     }
   } else {
@@ -496,9 +474,113 @@ function handlePlayerReady(clientId) {
   }
 }
 
+function handleRematchRequest(clientId, msg) {
+  const player = players.get(clientId);
+  if (!player) return;
+
+  const code = String(msg.lobbyCode || player.lobbyCode || '').toUpperCase().trim();
+  const lobby = lobbies.get(code);
+  console.log('[rematch] request', {
+    clientId,
+    code,
+    hasLobby: !!lobby,
+    playerLobby: player.lobbyCode || null,
+  });
+  if (!lobby) {
+    sendTo(clientId, { type: 'error', message: 'Lobby not found.' });
+    return;
+  }
+
+  if (!player.lobbyCode) player.lobbyCode = code;
+  if (!lobby.players.includes(clientId)) lobby.players.push(clientId);
+
+  lobby.players = lobby.players.filter(id => players.has(id));
+  if (!lobby.players.includes(clientId)) lobby.players.push(clientId);
+
+  let opponentId = lobby.players.find(id => id !== clientId) || null;
+  if (!opponentId && Array.isArray(lobby.lastPlayers)) {
+    const other = lobby.lastPlayers.find(p => normalizePlayerName(p.name) !== normalizePlayerName(player.name));
+    if (other && other.name) {
+      const foundId = findPlayerIdByName(other.name, clientId);
+      if (foundId) {
+        opponentId = foundId;
+        if (!lobby.players.includes(foundId)) lobby.players.push(foundId);
+        const opp = players.get(foundId);
+        if (opp && !opp.lobbyCode) opp.lobbyCode = code;
+      }
+    }
+  }
+
+  console.log('[rematch] lobby players', { code, players: lobby.players, opponentId });
+  if (!opponentId) {
+    sendTo(clientId, { type: 'error', message: 'Opponent not connected for a rematch.' });
+    return;
+  }
+
+  lobby.pendingRematch = {
+    fromId: clientId,
+    at: Date.now(),
+  };
+
+  console.log('[rematch] invite sent', { to: opponentId, code });
+  sendTo(opponentId, {
+    type: 'rematch_invite',
+    fromName: player.name,
+    fromId: clientId,
+    lobbyCode: code,
+  });
+
+  sendTo(clientId, { type: 'rematch_requested' });
+}
+
+function handleRematchResponse(clientId, msg) {
+  const player = players.get(clientId);
+  if (!player) return;
+
+  const code = String(msg.lobbyCode || player.lobbyCode || '').toUpperCase().trim();
+  const lobby = lobbies.get(code);
+  console.log('[rematch] response', {
+    clientId,
+    code,
+    accepted: msg.accepted === true,
+    hasLobby: !!lobby,
+  });
+  if (!lobby) return;
+
+  if (!player.lobbyCode) player.lobbyCode = code;
+  if (!lobby.players.includes(clientId)) lobby.players.push(clientId);
+
+  const pending = lobby.pendingRematch;
+  console.log('[rematch] pending', { code, pending });
+  if (!pending || !lobby.players.includes(pending.fromId)) return;
+
+  const accepted = msg.accepted === true;
+  if (accepted) {
+    lobby.readyPlayers = new Set();
+    lobby.pendingRematch = null;
+    console.log('[rematch] accepted -> startGame', { code });
+    startGame(code);
+  } else {
+    lobby.pendingRematch = null;
+    console.log('[rematch] declined', { code, fromId: pending.fromId });
+    sendTo(pending.fromId, {
+      type: 'rematch_declined',
+      fromName: player.name || 'Opponent',
+    });
+  }
+}
+
 function startGame(code) {
   const lobby = lobbies.get(code);
   if (!lobby) return;
+
+  console.log('[game] startGame', {
+    code,
+    players: lobby.players,
+    status: lobby.status,
+  });
+
+  lobby.lastPlayers = getLobbyPlayerList(code).map(p => ({ id: p.id, name: p.name }));
 
   lobby.status = 'playing';
   lobby.startTime = Date.now();
@@ -523,6 +605,7 @@ function startGame(code) {
     if (p) p.cheatCode = getCheatSequence(0, seed, cid);
     sendTo(cid, {
       type: 'game_start',
+      lobbyCode: code,
       seed,
       gameMode: lobby.gameMode,
       players: getLobbyPlayerList(code),
@@ -541,16 +624,6 @@ function handleGameUpdate(clientId, msg) {
   }
   if (!player.lobbyCode) return;
 
-  console.log('[net] relay game_update', {
-    clientId,
-    lobbyCode: player.lobbyCode,
-    score: msg.score,
-    level: msg.level,
-    lines: msg.lines,
-    boardRows: Array.isArray(msg.board) ? msg.board.length : 0,
-    ts: Date.now(),
-  });
-
   broadcastToLobby(player.lobbyCode, {
     type: 'opponent_update',
     board: msg.board,
@@ -561,25 +634,6 @@ function handleGameUpdate(clientId, msg) {
   }, clientId);
 }
 
-function handleLinesCleared(clientId, msg) {
-  const player = players.get(clientId);
-  if (!player) return;
-  if (!player.lobbyCode) {
-    tryAttachLobbyFromMessage(player, clientId, msg);
-  }
-  if (!player.lobbyCode) return;
-
-  const lobby = lobbies.get(player.lobbyCode);
-  if (!lobby) return;
-
-  // Obstacle mode: send garbage lines to opponent
-  if (lobby.gameMode === 'obstacle') {
-    const garbage = Math.max(0, (msg.count || 0) - 1);
-    if (garbage > 0) {
-      broadcastToLobby(player.lobbyCode, { type: 'add_garbage', lines: garbage }, clientId);
-    }
-  }
-}
 
 function handleCheatActivate(clientId, msg) {
   const player = players.get(clientId);
@@ -632,18 +686,7 @@ function handleCheatActivate(clientId, msg) {
   }
 
   const activationIndex = player.cheatActivations;
-  const effects = _pickAllEffects({ lobby, clientId, activationCount: activationIndex });
-
-  // Apply side-effects that are server-driven (garbage pulse to opponent).
-  for (const eff of effects) {
-    if (eff.type === 'garbage_pulse') {
-      _scheduleGarbagePulse(player.lobbyCode, clientId, {
-        ticks: eff.ticks,
-        intervalMs: eff.intervalMs,
-        linesPerTick: eff.linesPerTick,
-      });
-    }
-  }
+  const effects = _pickAllEffects();
 
   player.cheatActivations++;
   const nextCode = getCheatSequence(player.cheatActivations, lobby.seed, clientId);
@@ -720,7 +763,11 @@ function handleGameOver(clientId, msg) {
 function handleSaveSettings(clientId, msg) {
   const player = players.get(clientId);
   if (!player) return;
-  player.settings = Object.assign(player.settings, msg.settings || {});
+  const incoming = Object.assign({}, msg.settings || {});
+  if (Object.prototype.hasOwnProperty.call(incoming, 'gameMode')) {
+    incoming.gameMode = normalizeGameMode(incoming.gameMode);
+  }
+  player.settings = Object.assign(player.settings, incoming);
   sendTo(clientId, { type: 'settings_saved', settings: player.settings });
 }
 

@@ -475,32 +475,4 @@ describe('Tetris2 Server', () => {
     });
   });
 
-  /* ── Obstacle mode garbage lines ──────────────────────────────── */
-  describe('Obstacle mode garbage lines', () => {
-    it('sends garbage lines to opponent when lines cleared in obstacle mode', async () => {
-      const ws1 = await wsConnect();
-      const ws2 = await wsConnect();
-      await nextMessage(ws1);
-      await nextMessage(ws2);
-
-      await setName(ws1, 'Alice');
-      await setName(ws2, 'Bob');
-
-      send(ws1, { type: 'create_lobby', gameMode: 'obstacle' });
-      const { code } = await waitForType(ws1, 'lobby_created');
-      send(ws2, { type: 'join_lobby', code });
-      await waitForType(ws2, 'lobby_joined');
-
-      send(ws1, { type: 'player_ready' });
-      send(ws2, { type: 'player_ready' });
-      await waitForType(ws1, 'game_start');
-      await waitForType(ws2, 'game_start');
-
-      // ws1 clears 3 lines → 2 garbage to ws2
-      send(ws1, { type: 'lines_cleared', count: 3, score: 500 });
-      const garbage = await waitForType(ws2, 'add_garbage');
-      assert.equal(garbage.lines, 2);
-      ws1.close(); ws2.close();
-    });
-  });
 });

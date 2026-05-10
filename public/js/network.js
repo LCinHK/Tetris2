@@ -17,7 +17,6 @@
       this.ws = new WebSocket(`${proto}://${location.host}`);
 
       this.ws.addEventListener('open', () => {
-        console.log('[ws] open');
         // Restore player name
         if (this.playerName) {
           this.send({ type: 'set_name', name: this.playerName });
@@ -28,9 +27,6 @@
       this.ws.addEventListener('message', (ev) => {
         try {
           const msg = JSON.parse(ev.data);
-          if (msg && (msg.type === 'opponent_update' || msg.type === 'game_start')) {
-            console.log('[ws] recv', msg.type);
-          }
           if (msg.type === 'connected') {
             this.clientId = msg.clientId;
           }
@@ -40,11 +36,9 @@
       });
 
       this.ws.addEventListener('close', () => {
-        console.log('[ws] close');
         this._emit('close');
       });
       this.ws.addEventListener('error', () => {
-        console.log('[ws] error');
         this._emit('error');
       });
     },
@@ -52,11 +46,6 @@
     send(obj) {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify(obj));
-      } else {
-        console.log('[ws] send blocked (not open)', {
-          readyState: this.ws ? this.ws.readyState : null,
-          type: obj && obj.type,
-        });
       }
     },
 
