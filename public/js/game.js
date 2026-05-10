@@ -121,7 +121,7 @@
     const cheatTimerDisplay = document.getElementById('cheatTimerDisplay');
 
     /* ── Mode badge ──────────────────────────────────────────────── */
-    const modeLabels = { score_attack: 'Score Attack', time_attack: 'Time Attack', obstacle: 'Obstacle' };
+    const modeLabels = { score_attack: 'Score Attack', time_attack: 'Time Attack' };
     if (modeBadge) modeBadge.textContent = modeLabels[gameMode] || gameMode;
 
     /* ── Show opponent area if multiplayer ───────────────────────── */
@@ -186,12 +186,6 @@
         },
         onLinesCleared({ count, score }) {
             playClearSound();
-            Network.send({
-                type: 'lines_cleared',
-                count,
-                score,
-                lobbyCode: gameConfig.lobbyCode || null,
-            });
         },
         onBoardUpdate(board) {
             // Always send after a piece locks (board state finalised)
@@ -540,13 +534,6 @@
         endGame(game.score, game.lines, game.level, false);
     });
 
-    Network.on('add_garbage', (msg) => {
-        if (msg.lines > 0) {
-            game.addGarbageLines(msg.lines);
-            notify(`+${msg.lines} garbage line${msg.lines > 1 ? 's' : ''}!`, 'error');
-        }
-    });
-
     Network.on('cheat_activated', (msg) => {
         cheat.markActive(msg.duration || 30000);
 
@@ -562,8 +549,6 @@
             } else if (eff.type === 'slow_drop') {
                 game.activateSlowDrop(eff.duration || 30000, eff.multiplier || 1.7);
                 effectLabels.push('Slow Drop');
-            } else if (eff.type === 'garbage_pulse') {
-                if (!isSolo) effectLabels.push('Garbage Pulse');
             } else if (eff.type === 'opponent_obfuscate') {
                 effectLabels.push('Opponent Obfuscate');
             }

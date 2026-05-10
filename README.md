@@ -33,10 +33,10 @@ A real-time, two-player competitive Tetris game built entirely with Node.js and 
 ## Features
 
 - 🎮 **1v1 multiplayer** via WebSockets with lobby codes
-- 🃏 **Three game modes**: Score Attack, Time Attack (3 min), Obstacle (garbage lines)
+- 🃏 **Two game modes**: Score Attack, Time Attack (3 min)
 - 👻 **Ghost piece**, **hold piece**, **next piece preview**
 - 📊 **Per-session stats**: games played, high score, lines cleared, win/loss record, recent score history
-- 🔑 **Escalating cheat codes** (Konami-style arrow-key sequences) granting 2 of 3 advantages (score boost / slow drop / garbage pulse)
+- 🔑 **Escalating cheat codes** (Konami-style arrow-key sequences) granting score boost + slow drop
 - ⚙️ **Persistent settings** (cheat on/off, sound on/off, default game mode) stored per WebSocket session
 - 🛡️ Path-traversal protection on the static file server
 - ✅ Unit-tested server with Node.js built-in test runner (no extra test framework)
@@ -99,7 +99,7 @@ Tetris2/
 - Exposes `GET /api/stats` (JSON array of all connected players' stats)
 - Manages in-memory state: `players` map, `lobbies` map, `playerStats` map
 - Handles the full WebSocket lifecycle (connect → lobby → game → game-over → disconnect)
-- Implements all game logic: lobby management, game start (shared seed for deterministic RNG), garbage-line dispatch, cheat-code validation, and stats tracking
+- Implements all game logic: lobby management, game start (shared seed for deterministic RNG), cheat-code validation, and stats tracking
 
 **`public/js/tetris.js`** — self-contained Tetris engine:
 - `TetrisGame` class instantiated on a `<canvas>` element
@@ -107,7 +107,7 @@ Tetris2/
 - Full SRS (Super Rotation System) wall-kick tables for all pieces
 - Ghost piece, hold, scoring (with level multiplier and optional 2× score boost)
 - Line-clear base scores: 1 line = 100, 2 = 300, 3 = 500, 4 = 1200 (before level and score boost)
-- `addGarbageLines()` for Obstacle mode; `activateScoreBoost()` for cheat effect
+- `activateScoreBoost()` for cheat effect
 
 **`public/js/network.js`** — thin WebSocket wrapper loaded on every page:
 - Connects to the server over `ws://` or `wss://` depending on the page protocol
@@ -156,7 +156,7 @@ npm test
 
 The test suite uses **Node.js's built-in test runner** (`node:test`) — no additional packages needed. It spins up a real HTTP + WebSocket server on a random port, runs all assertions, and tears down cleanly.
 
-Test coverage includes: HTTP static file serving, path-traversal blocking, WebSocket connection lifecycle, player name setting, lobby create/join/leave/full, game start, cheat-code activation and rejection, game-over stat recording, settings save/restore, and Obstacle mode garbage lines.
+Test coverage includes: HTTP static file serving, path-traversal blocking, WebSocket connection lifecycle, player name setting, lobby create/join/leave/full, game start, cheat-code activation and rejection, game-over stat recording, and settings save/restore.
 
 ---
 
@@ -166,7 +166,6 @@ Test coverage includes: HTTP static file serving, path-traversal blocking, WebSo
 |---|---|
 | **Score Attack** | Classic — highest score when the game ends wins |
 | **Time Attack** | 3-minute timer — most points when time runs out wins |
-| **Obstacle** | Clearing lines sends garbage rows to your opponent (clearing N lines sends N−1 garbage rows) |
 
 ---
 
@@ -189,7 +188,6 @@ Test coverage includes: HTTP static file serving, path-traversal blocking, WebSo
 
 - **Score Attack**: Highest score wins when a player tops out.
 - **Time Attack**: Highest score wins when the 3-minute timer ends.
-- **Obstacle**: Same scoring rules as Score Attack, with garbage-line attacks enabled.
 
 ---
 
@@ -207,11 +205,10 @@ Cheat codes are optional (toggled in Settings). When enabled, the server sends e
 
 ### Effects
 
-On each successful activation, the player receives **all 3 advantages** (except `garbage_pulse` in solo games):
+On each successful activation, the player receives both advantages:
 
 1) `score_boost` — doubles scoring for 30 seconds
-2) `garbage_pulse` — adds 1 garbage line to the opponent every 5 seconds for 10 seconds (2 lines total)
-3) `slow_drop` — slows the player's block auto-drop for 30 seconds
+2) `slow_drop` — slows the player's block auto-drop for 30 seconds
 
 ---
 
@@ -229,7 +226,6 @@ All messages are JSON objects with a `type` field.
 | `leave_lobby` | — | Leave current lobby |
 | `player_ready` | — | Signal ready; game starts when all players ready |
 | `game_update` | `{ board, score, level, lines }` | Broadcast board state to opponent |
-| `lines_cleared` | `{ count, score }` | Notify server of cleared lines (triggers garbage in Obstacle mode) |
 | `cheat_activate` | `{ sequence, manual }` | Submit a cheat-code key sequence or manual activation |
 | `game_over` | `{ score, linesCleared, gameMode }` | Report game over |
 | `get_stats` | — | Request current session stats |
@@ -248,9 +244,8 @@ All messages are JSON objects with a `type` field.
 | `player_ready` | `playerId`, `players` | A player marked themselves ready |
 | `game_start` | `seed`, `gameMode`, `players`, `cheatCode`, `cheatUsesMax`, `cheatUsesRemaining` | Game begins; `seed` drives the shared RNG |
 | `opponent_update` | `board`, `score`, `level`, `lines` | Opponent's board state |
-| `add_garbage` | `lines` | Add N garbage rows (Obstacle mode) |
 | `opponent_game_over` | `score`, `playerName` | Opponent's game ended |
-| `cheat_activated` | `effects`, `duration`, `nextCheatCode`, `cheatUsesMax`, `cheatUsesRemaining` | Cheat accepted; grants all effects (solo skips `garbage_pulse`) |
+| `cheat_activated` | `effects`, `duration`, `nextCheatCode`, `cheatUsesMax`, `cheatUsesRemaining` | Cheat accepted; grants all effects |
 | `cheat_invalid` | `reason`, `cheatUsesMax`, `cheatUsesRemaining` | Cheat rejected |
 | `cheat_effect` | `effect`, `duration` | Effect applied to this player (e.g. obfuscate) |
 | `game_over_confirmed` | `stats` | Server confirms game-over and returns updated stats |

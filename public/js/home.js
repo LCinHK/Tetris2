@@ -28,6 +28,7 @@
   /* ── Local state ─────────────────────────────────────────────── */
   let currentLobbyCode = null;
   let isReady = false;
+  const VALID_MODES = new Set(['score_attack', 'time_attack']);
 
   /* ── Restore persisted state ─────────────────────────────────── */
   function restoreState() {
@@ -37,8 +38,9 @@
     const settings = _loadSettings();
     cheatEnabledCb.checked  = settings.cheatEnabled !== false;
     soundEnabledCb.checked  = settings.soundEnabled !== false;
-    defaultModeSelect.value = settings.gameMode || 'score_attack';
-    if (gameModeSelect) gameModeSelect.value = settings.gameMode || 'score_attack';
+    const mode = _normalizeMode(settings.gameMode);
+    defaultModeSelect.value = mode;
+    if (gameModeSelect) gameModeSelect.value = mode;
 
     _renderStats(_loadStats());
   }
@@ -161,7 +163,7 @@
       playerNameInput.focus();
       return notify('Please set your name first.', 'error');
     }
-    Network.send({ type: 'create_lobby', gameMode: gameModeSelect.value });
+    Network.send({ type: 'create_lobby', gameMode: _normalizeMode(gameModeSelect.value) });
   });
 
   joinGameBtn.addEventListener('click', () => {
@@ -191,11 +193,11 @@
     const settings = {
       cheatEnabled: cheatEnabledCb.checked,
       soundEnabled: soundEnabledCb.checked,
-      gameMode:     defaultModeSelect.value,
+      gameMode:     _normalizeMode(defaultModeSelect.value),
     };
     localStorage.setItem('settings', JSON.stringify(settings));
     Network.send({ type: 'save_settings', settings });
-    if (gameModeSelect) gameModeSelect.value = settings.gameMode;
+    if (gameModeSelect) gameModeSelect.value = _normalizeMode(settings.gameMode);
     notify('Settings saved.', 'success');
   });
 
@@ -275,7 +277,7 @@
       const merged = {
         cheatEnabled: s.cheatEnabled !== false,
         soundEnabled: s.soundEnabled !== false,
-        gameMode: s.gameMode || 'score_attack',
+        gameMode: _normalizeMode(s.gameMode),
       };
       localStorage.setItem('settings', JSON.stringify(merged));
       cheatEnabledCb.checked  = merged.cheatEnabled;
@@ -296,8 +298,11 @@
   function _esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
+  function _normalizeMode(mode) {
+    return VALID_MODES.has(mode) ? mode : 'score_attack';
+  }
   function _modeLabel(mode) {
-    return { score_attack: 'Score Attack', time_attack: 'Time Attack (3 min)', obstacle: 'Obstacle' }[mode] || mode;
+    return { score_attack: 'Score Attack', time_attack: 'Time Attack (3 min)' }[_normalizeMode(mode)] || 'Score Attack';
   }
 
   /* ── Init ─────────────────────────────────────────────────────── */

@@ -25,16 +25,16 @@ let clientIdCounter = 0;
    - Pattern: each key is pressed twice (pairs)
    - Escalating difficulty after each activation
    - Limited to 5 activations per player per game
-    - Each activation grants all advantages (garbage pulse only if opponent present):
-       1) score boost (2× scoring for 30s)
-       2) add garbage line to opponent every 5s for 10s (2 lines)
-       3) slow drop speed for player for 30s
+    - Each activation grants all advantages:
+      1) score boost (2× scoring for 30s)
+      2) slow drop speed for player for 30s
 ───────────────────────────────────────── */
 
 const MAX_CHEAT_USES_PER_GAME = 5;
 
 const CHEAT_KEYS_ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 const CHEAT_KEYS_DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const VALID_GAME_MODES = new Set(['score_attack', 'time_attack']);
 
 function fnv1a32(input) {
   let hash = 0x811c9dc5;
@@ -83,41 +83,17 @@ function getCheatSequence(activationCount, gameSeed = 0, clientId = '') {
   return seq;
 }
 
-function _pickAllEffects({ lobby, clientId}) {
-  const player = players.get(clientId);
-  const hasOpponent = lobby && Number(lobby.startPlayersCount || 0) > 1;
-
+function _pickAllEffects() {
   const effects = [
     { type: 'score_boost', duration: 30000 },
     { type: 'slow_drop', duration: 30000, multiplier: 1.7 },
   ];
-  if (hasOpponent) {
-    effects.push({ type: 'garbage_pulse', duration: 10000, intervalMs: 5000, linesPerTick: 1, ticks: 2 });
-  }
 
   return effects;
 }
 
-function _scheduleGarbagePulse(lobbyCode, fromClientId, { ticks = 2, intervalMs = 5000, linesPerTick = 1 } = {}) {
-  const lobby = lobbies.get(lobbyCode);
-  if (!lobby) return;
-
-  for (let i = 0; i < ticks; i++) {
-    setTimeout(() => {
-      const currentLobby = lobbies.get(lobbyCode);
-      if (!currentLobby || currentLobby.status !== 'playing') return;
-
-      const targets = currentLobby.players.filter(id => id !== fromClientId);
-      if (targets.length === 0) return;
-
-      // Only apply if the opponent is still in-game.
-      targets.forEach(tid => {
-        const t = players.get(tid);
-        if (!t || t.gameOver) return;
-        sendTo(tid, { type: 'add_garbage', lines: linesPerTick });
-      });
-    }, i * intervalMs);
-  }
+function normalizeGameMode(mode) {
+  return VALID_GAME_MODES.has(mode) ? mode : 'score_attack';
 }
 
 /* ─────────────────────────────────────────
@@ -323,7 +299,6 @@ function handleMessage(ws, msg) {
     case 'leave_lobby':      return handleLeaveLobby(clientId);
     case 'player_ready':     return handlePlayerReady(clientId);
     case 'game_update':      return handleGameUpdate(clientId, msg);
-    case 'lines_cleared':    return handleLinesCleared(clientId, msg);
     case 'cheat_activate':   return handleCheatActivate(clientId, msg);
     case 'game_over':        return handleGameOver(clientId, msg);
     case 'get_stats':        return sendTo(clientId, { type: 'stats', stats: playerStats.get(clientId) });
@@ -393,7 +368,7 @@ function handleCreateLobby(clientId, msg) {
   let code;
   do { code = generateLobbyCode(); } while (lobbies.has(code));
 
-  const gameMode = msg.gameMode || 'score_attack';
+  const gameMode = normalizeGameMode(msg.gameMode);
   lobbies.set(code, {
     code,
     host: clientId,
@@ -561,25 +536,6 @@ function handleGameUpdate(clientId, msg) {
   }, clientId);
 }
 
-function handleLinesCleared(clientId, msg) {
-  const player = players.get(clientId);
-  if (!player) return;
-  if (!player.lobbyCode) {
-    tryAttachLobbyFromMessage(player, clientId, msg);
-  }
-  if (!player.lobbyCode) return;
-
-  const lobby = lobbies.get(player.lobbyCode);
-  if (!lobby) return;
-
-  // Obstacle mode: send garbage lines to opponent
-  if (lobby.gameMode === 'obstacle') {
-    const garbage = Math.max(0, (msg.count || 0) - 1);
-    if (garbage > 0) {
-      broadcastToLobby(player.lobbyCode, { type: 'add_garbage', lines: garbage }, clientId);
-    }
-  }
-}
 
 function handleCheatActivate(clientId, msg) {
   const player = players.get(clientId);
@@ -632,18 +588,7 @@ function handleCheatActivate(clientId, msg) {
   }
 
   const activationIndex = player.cheatActivations;
-  const effects = _pickAllEffects({ lobby, clientId, activationCount: activationIndex });
-
-  // Apply side-effects that are server-driven (garbage pulse to opponent).
-  for (const eff of effects) {
-    if (eff.type === 'garbage_pulse') {
-      _scheduleGarbagePulse(player.lobbyCode, clientId, {
-        ticks: eff.ticks,
-        intervalMs: eff.intervalMs,
-        linesPerTick: eff.linesPerTick,
-      });
-    }
-  }
+  const effects = _pickAllEffects();
 
   player.cheatActivations++;
   const nextCode = getCheatSequence(player.cheatActivations, lobby.seed, clientId);
@@ -720,7 +665,11 @@ function handleGameOver(clientId, msg) {
 function handleSaveSettings(clientId, msg) {
   const player = players.get(clientId);
   if (!player) return;
-  player.settings = Object.assign(player.settings, msg.settings || {});
+  const incoming = Object.assign({}, msg.settings || {});
+  if (Object.prototype.hasOwnProperty.call(incoming, 'gameMode')) {
+    incoming.gameMode = normalizeGameMode(incoming.gameMode);
+  }
+  player.settings = Object.assign(player.settings, incoming);
   sendTo(clientId, { type: 'settings_saved', settings: player.settings });
 }
 

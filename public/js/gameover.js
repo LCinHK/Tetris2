@@ -31,7 +31,6 @@
   const modeLabels = {
     score_attack: 'Score Attack',
     time_attack:  'Time Attack',
-    obstacle:     'Obstacle',
   };
 
   /* ── Populate header ─────────────────────────────────────────── */
