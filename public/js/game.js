@@ -204,13 +204,6 @@
             const now = Date.now();
             if (now - _lastPieceMoveSend < 50) return;
             _lastPieceMoveSend = now;
-            console.log('[net] send game_update', {
-                ts: now,
-                score: game.score,
-                level: game.level,
-                lines: game.lines,
-                boardRows: Array.isArray(board) ? board.length : 0,
-            });
             Network.send({
                 type: 'game_update',
                 board,
@@ -472,6 +465,7 @@
             gameMode,
             result,
             hadOpponent: !isSolo,
+            lobbyCode: gameConfig.lobbyCode || null,
             opponent: !isSolo ? _opponentSnapshot : null,
         }));
 
@@ -494,14 +488,6 @@
 
     /* ── Network events ──────────────────────────────────────────── */
     Network.on('opponent_update', (msg) => {
-        console.log('[net] recv opponent_update', {
-            ts: Date.now(),
-            score: msg.score,
-            level: msg.level,
-            lines: msg.lines,
-            playerName: msg.playerName,
-            boardRows: Array.isArray(msg.board) ? msg.board.length : 0,
-        });
         if (opponentArea && !opponentArea.classList.contains('hidden')) {
             if (msg.playerName && opponentLabel) {
                 opponentLabel.textContent = msg.playerName.toUpperCase();

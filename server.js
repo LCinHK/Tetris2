@@ -152,6 +152,16 @@ function isNameTakenInLobby(lobby, name, excludeId = null) {
   });
 }
 
+function findPlayerIdByName(name, excludeId = null) {
+  const target = normalizePlayerName(name);
+  if (!target) return null;
+  for (const [id, p] of players.entries()) {
+    if (id === excludeId) continue;
+    if (p && normalizePlayerName(p.name) === target) return id;
+  }
+  return null;
+}
+
 /* ─────────────────────────────────────────
    Static file server
 ───────────────────────────────────────── */
@@ -256,15 +266,6 @@ wss.on('connection', (ws) => {
   ws.on('message', (raw) => {
     try {
       const msg = JSON.parse(raw);
-      if (msg && msg.type === 'game_update') {
-        const p = players.get(clientId);
-        console.log('[net] recv game_update', {
-          clientId,
-          lobbyCode: p ? p.lobbyCode : null,
-          boardRows: Array.isArray(msg.board) ? msg.board.length : 0,
-          ts: Date.now(),
-        });
-      }
       handleMessage(ws, msg);
     } catch (e) {
       // ignore malformed messages
@@ -289,7 +290,7 @@ function handleMessage(ws, msg) {
   if (!player) return;
 
   if (msg.type === 'game_update' && !player.lobbyCode && !msg.lobbyCode) {
-    console.log('[net] drop game_update (no lobby)', { clientId, ts: Date.now() });
+    // No lobby to attach to; ignore game updates until we can reattach.
   }
 
   switch (msg.type) {
@@ -298,6 +299,8 @@ function handleMessage(ws, msg) {
     case 'join_lobby':       return handleJoinLobby(clientId, msg);
     case 'leave_lobby':      return handleLeaveLobby(clientId);
     case 'player_ready':     return handlePlayerReady(clientId);
+    case 'rematch_request':  return handleRematchRequest(clientId, msg);
+    case 'rematch_response': return handleRematchResponse(clientId, msg);
     case 'game_update':      return handleGameUpdate(clientId, msg);
     case 'cheat_activate':   return handleCheatActivate(clientId, msg);
     case 'game_over':        return handleGameOver(clientId, msg);
@@ -437,7 +440,7 @@ function leaveLobby(clientId, code) {
   pruneLobbyPlayers(lobby);
 
   if (lobby.players.length === 0) {
-    if (lobby.status !== 'playing') {
+    if (lobby.status === 'waiting') {
       lobbies.delete(code);
     }
   } else {
@@ -471,9 +474,113 @@ function handlePlayerReady(clientId) {
   }
 }
 
+function handleRematchRequest(clientId, msg) {
+  const player = players.get(clientId);
+  if (!player) return;
+
+  const code = String(msg.lobbyCode || player.lobbyCode || '').toUpperCase().trim();
+  const lobby = lobbies.get(code);
+  console.log('[rematch] request', {
+    clientId,
+    code,
+    hasLobby: !!lobby,
+    playerLobby: player.lobbyCode || null,
+  });
+  if (!lobby) {
+    sendTo(clientId, { type: 'error', message: 'Lobby not found.' });
+    return;
+  }
+
+  if (!player.lobbyCode) player.lobbyCode = code;
+  if (!lobby.players.includes(clientId)) lobby.players.push(clientId);
+
+  lobby.players = lobby.players.filter(id => players.has(id));
+  if (!lobby.players.includes(clientId)) lobby.players.push(clientId);
+
+  let opponentId = lobby.players.find(id => id !== clientId) || null;
+  if (!opponentId && Array.isArray(lobby.lastPlayers)) {
+    const other = lobby.lastPlayers.find(p => normalizePlayerName(p.name) !== normalizePlayerName(player.name));
+    if (other && other.name) {
+      const foundId = findPlayerIdByName(other.name, clientId);
+      if (foundId) {
+        opponentId = foundId;
+        if (!lobby.players.includes(foundId)) lobby.players.push(foundId);
+        const opp = players.get(foundId);
+        if (opp && !opp.lobbyCode) opp.lobbyCode = code;
+      }
+    }
+  }
+
+  console.log('[rematch] lobby players', { code, players: lobby.players, opponentId });
+  if (!opponentId) {
+    sendTo(clientId, { type: 'error', message: 'Opponent not connected for a rematch.' });
+    return;
+  }
+
+  lobby.pendingRematch = {
+    fromId: clientId,
+    at: Date.now(),
+  };
+
+  console.log('[rematch] invite sent', { to: opponentId, code });
+  sendTo(opponentId, {
+    type: 'rematch_invite',
+    fromName: player.name,
+    fromId: clientId,
+    lobbyCode: code,
+  });
+
+  sendTo(clientId, { type: 'rematch_requested' });
+}
+
+function handleRematchResponse(clientId, msg) {
+  const player = players.get(clientId);
+  if (!player) return;
+
+  const code = String(msg.lobbyCode || player.lobbyCode || '').toUpperCase().trim();
+  const lobby = lobbies.get(code);
+  console.log('[rematch] response', {
+    clientId,
+    code,
+    accepted: msg.accepted === true,
+    hasLobby: !!lobby,
+  });
+  if (!lobby) return;
+
+  if (!player.lobbyCode) player.lobbyCode = code;
+  if (!lobby.players.includes(clientId)) lobby.players.push(clientId);
+
+  const pending = lobby.pendingRematch;
+  console.log('[rematch] pending', { code, pending });
+  if (!pending || !lobby.players.includes(pending.fromId)) return;
+
+  const accepted = msg.accepted === true;
+  if (accepted) {
+    lobby.readyPlayers = new Set();
+    lobby.pendingRematch = null;
+    console.log('[rematch] accepted -> startGame', { code });
+    startGame(code);
+  } else {
+    lobby.pendingRematch = null;
+    console.log('[rematch] declined', { code, fromId: pending.fromId });
+    sendTo(pending.fromId, {
+      type: 'rematch_declined',
+      fromName: player.name || 'Opponent',
+    });
+  }
+}
+
 function startGame(code) {
   const lobby = lobbies.get(code);
   if (!lobby) return;
+
+  console.log('[game] startGame', {
+    code,
+    players: lobby.players,
+    status: lobby.status,
+  });
+
+  lobby.lastPlayers = getLobbyPlayerList(code).map(p => ({ id: p.id, name: p.name }));
 
   lobby.status = 'playing';
   lobby.startTime = Date.now();
@@ -498,6 +605,7 @@ function startGame(code) {
     if (p) p.cheatCode = getCheatSequence(0, seed, cid);
     sendTo(cid, {
       type: 'game_start',
+      lobbyCode: code,
       seed,
       gameMode: lobby.gameMode,
       players: getLobbyPlayerList(code),
@@ -515,16 +623,6 @@ function handleGameUpdate(clientId, msg) {
     tryAttachLobbyFromMessage(player, clientId, msg);
   }
   if (!player.lobbyCode) return;
-
-  console.log('[net] relay game_update', {
-    clientId,
-    lobbyCode: player.lobbyCode,
-    score: msg.score,
-    level: msg.level,
-    lines: msg.lines,
-    boardRows: Array.isArray(msg.board) ? msg.board.length : 0,
-    ts: Date.now(),
-  });
 
   broadcastToLobby(player.lobbyCode, {
     type: 'opponent_update',
