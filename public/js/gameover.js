@@ -43,13 +43,6 @@
   const opponent = lastGame.opponent || null;
   const lines  = lastGame.linesCleared || 0;
 
-  console.log('[gameover] init', {
-    hadOpponent,
-    isSolo,
-    lobbyCode: lastGame.lobbyCode || null,
-    result: lastGame.result,
-    networkReady: !!window.Network,
-  });
 
   const wrapper = document.querySelector('.gameover-wrapper');
   if (wrapper && !hadOpponent) wrapper.classList.add('no-opponent');
@@ -124,25 +117,18 @@
   const playAgainBtn = document.getElementById('playAgainBtn');
   if (playAgainBtn) {
     playAgainBtn.addEventListener('click', () => {
-      console.log('[gameover] play again clicked', {
-        isSolo,
-        lobbyCode: lastGame.lobbyCode || null,
-        hasNetwork: !!window.Network,
-      });
       if (isSolo) {
         startSoloGame();
         return;
       }
 
       if (!window.Network) {
-        console.log('[gameover] Network missing on multiplayer rematch');
         window.location.href = '/';
         return;
       }
 
       const lobbyCode = lastGame.lobbyCode || null;
       if (!lobbyCode) {
-        console.log('[gameover] Missing lobbyCode for rematch');
         window.alert('Unable to request a rematch. Please return to Home.');
         return;
       }
@@ -162,11 +148,9 @@
   /* ── Rematch handlers (multiplayer) ─────────────────────────── */
   if (window.Network) {
     Network.on('rematch_invite', (msg) => {
-      console.log('[gameover] rematch_invite', msg);
       const fromName = (msg && msg.fromName) ? msg.fromName : 'Your opponent';
       const prompt = `${fromName} is inviting you to a rematch — ready for another round of Tetris?`;
       const accepted = window.confirm(prompt);
-      console.log('[gameover] rematch_invite response', { accepted });
       Network.send({
         type: 'rematch_response',
         lobbyCode: msg && msg.lobbyCode ? msg.lobbyCode : (lastGame.lobbyCode || null),
@@ -179,7 +163,6 @@
     });
 
     Network.on('rematch_declined', (msg) => {
-      console.log('[gameover] rematch_declined', msg);
       if (playAgainBtn) {
         playAgainBtn.disabled = false;
         playAgainBtn.textContent = '▶ Play Again';
@@ -190,11 +173,8 @@
     });
 
     Network.on('game_start', (msg) => {
-      console.log('[gameover] game_start received', msg);
       startNetworkGame(msg);
     });
-  } else {
-    console.log('[gameover] Network not available; rematch handlers not bound');
   }
 
   /* ── Helpers ─────────────────────────────────────────────────── */
@@ -204,7 +184,6 @@
   }
 
   function startSoloGame() {
-    console.log('[gameover] startSoloGame');
     const mode = lastGame.gameMode || settings.gameMode || 'score_attack';
     localStorage.setItem('currentGame', JSON.stringify({
       gameMode: mode,
@@ -214,10 +193,6 @@
 
   function startNetworkGame(msg) {
     if (!msg) return;
-    console.log('[gameover] startNetworkGame', {
-      lobbyCode: msg.lobbyCode || lastGame.lobbyCode || null,
-      gameMode: msg.gameMode || lastGame.gameMode || 'score_attack',
-    });
     localStorage.setItem('currentGame', JSON.stringify({
       lobbyCode: msg.lobbyCode || lastGame.lobbyCode || null,
       gameMode: msg.gameMode || lastGame.gameMode || 'score_attack',
@@ -233,20 +208,14 @@
   function sendRematchRequest(lobbyCode) {
     if (!window.Network) return;
     if (Network.ws && Network.ws.readyState === WebSocket.OPEN) {
-      console.log('[gameover] rematch_request send (ws open)', { lobbyCode });
       Network.send({ type: 'rematch_request', lobbyCode });
       return;
     }
 
     const onOpen = () => {
-      console.log('[gameover] ws open, sending rematch_request', { lobbyCode });
       Network.off('open', onOpen);
       Network.send({ type: 'rematch_request', lobbyCode });
     };
-    console.log('[gameover] ws not open, waiting for open event', {
-      readyState: Network.ws ? Network.ws.readyState : null,
-      lobbyCode,
-    });
     Network.on('open', onOpen);
   }
 })();

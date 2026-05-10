@@ -14,8 +14,7 @@
   'use strict';
 
   const TRACKED_KEYS = new Set([
-    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-    '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
   ]);
 
   class CheatManager {
@@ -53,8 +52,7 @@
       if (!this.enabled || this._active) return;
       if (!TRACKED_KEYS.has(e.key))      return;
       // Only intercept for cheat when game is running (no modifier keys pressed
-      // during cheat input – they could conflict with game controls, so we track
-      // the same arrow keys the game uses; the game handles them separately)
+      // during cheat input – they could conflict with game controls)
 
       if (!this._sequence.length) return;
 
@@ -142,10 +140,7 @@
   }
 
   function _keyLabel(key) {
-    const map = {
-      ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
-    };
-    return map[key] || key;
+    return key;
   }
 
   window.CheatManager = CheatManager;
