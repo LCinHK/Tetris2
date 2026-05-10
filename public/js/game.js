@@ -219,9 +219,31 @@
     });
 
     /* ── Cheat manager ───────────────────────────────────────────── */
+    const SOLO_CHEAT_MAX_USES = 5;
+    let soloCheatUsesRemaining = SOLO_CHEAT_MAX_USES;
+    let soloCheatActivationCount = 0;
+
     const cheat = new CheatManager({
         enabled: settings.cheatEnabled !== false,
         onActivate(seq) {
+            if (isSolo && !gameConfig.lobbyCode) {
+                if (soloCheatUsesRemaining <= 0) {
+                    notify('Cheat limit reached.', 'error');
+                    return;
+                }
+                soloCheatUsesRemaining -= 1;
+                soloCheatActivationCount += 1;
+                const nextCheatCode = _getSoloCheatSequence(soloCheatActivationCount, seed);
+                handleCheatActivated({
+                    effects: _pickSoloCheatEffects(),
+                    duration: 30000,
+                    nextCheatCode,
+                    cheatUsesMax: SOLO_CHEAT_MAX_USES,
+                    cheatUsesRemaining: soloCheatUsesRemaining,
+                });
+                return;
+            }
+
             const wsReady = Network.ws && Network.ws.readyState === WebSocket.OPEN;
             if (!wsReady) {
                 notify('Cheat request failed (network not ready).', 'error');
@@ -242,7 +264,11 @@
         },
     });
 
-    if (gameConfig.cheatCode) cheat.setSequence(gameConfig.cheatCode);
+    if (gameConfig.cheatCode) {
+        cheat.setSequence(gameConfig.cheatCode);
+    } else if (isSolo) {
+        cheat.setSequence(_getSoloCheatSequence(soloCheatActivationCount, seed));
+    }
     cheat.attach();
 
     function updateCheatUses({ cheatUsesMax, cheatUsesRemaining } = {}) {
@@ -255,10 +281,17 @@
         }
     }
 
-    updateCheatUses({
-        cheatUsesMax: gameConfig.cheatUsesMax,
-        cheatUsesRemaining: gameConfig.cheatUsesRemaining,
-    });
+    if (Number.isFinite(gameConfig.cheatUsesMax)) {
+        updateCheatUses({
+            cheatUsesMax: gameConfig.cheatUsesMax,
+            cheatUsesRemaining: gameConfig.cheatUsesRemaining,
+        });
+    } else if (isSolo) {
+        updateCheatUses({
+            cheatUsesMax: SOLO_CHEAT_MAX_USES,
+            cheatUsesRemaining: soloCheatUsesRemaining,
+        });
+    }
 
     let cheatTimerInterval = null;
     let cheatTimerEnd = 0;
@@ -521,32 +554,7 @@
     });
 
     Network.on('cheat_activated', (msg) => {
-        cheat.markActive(msg.duration || 30000);
-
-        const effects = Array.isArray(msg.effects)
-            ? msg.effects
-            : (msg.cheatType ? [{ type: msg.cheatType, duration: msg.duration }] : []);
-
-        const effectLabels = [];
-        effects.forEach((eff) => {
-            if (eff.type === 'score_boost') {
-                game.activateScoreBoost(eff.duration || 30000);
-                effectLabels.push('Score Boost');
-            } else if (eff.type === 'slow_drop') {
-                game.activateSlowDrop(eff.duration || 30000, eff.multiplier || 1.7);
-                effectLabels.push('Slow Drop');
-            } else if (eff.type === 'opponent_obfuscate') {
-                effectLabels.push('Opponent Obfuscate');
-            }
-        });
-
-        if (effectLabels.length > 0) {
-            notify(`Cheat activated: ${effectLabels.join(' + ')}`, 'success');
-        }
-
-        startCheatTimer(msg.duration || 30000);
-        if (msg.nextCheatCode) cheat.setSequence(msg.nextCheatCode);
-        updateCheatUses(msg);
+        handleCheatActivated(msg);
     });
 
     Network.on('cheat_effect', (msg) => {
@@ -640,6 +648,72 @@
             losses: Math.max(Number(localStats.losses) || 0, Number(serverStats.losses) || 0),
             scores: mergedScores,
         };
+    }
+
+    function handleCheatActivated(msg) {
+        if (!msg) return;
+        cheat.markActive(msg.duration || 30000);
+
+        const effects = Array.isArray(msg.effects)
+            ? msg.effects
+            : (msg.cheatType ? [{ type: msg.cheatType, duration: msg.duration }] : []);
+
+        const effectLabels = [];
+        effects.forEach((eff) => {
+            if (eff.type === 'score_boost') {
+                game.activateScoreBoost(eff.duration || 30000);
+                effectLabels.push('Score Boost');
+            } else if (eff.type === 'slow_drop') {
+                game.activateSlowDrop(eff.duration || 30000, eff.multiplier || 1.7);
+                effectLabels.push('Slow Drop');
+            } else if (eff.type === 'opponent_obfuscate') {
+                effectLabels.push('Opponent Obfuscate');
+            }
+        });
+
+        if (effectLabels.length > 0) {
+            notify(`Cheat activated: ${effectLabels.join(' + ')}`, 'success');
+        }
+
+        startCheatTimer(msg.duration || 30000);
+        if (msg.nextCheatCode) cheat.setSequence(msg.nextCheatCode);
+        updateCheatUses(msg);
+    }
+
+    function _getSoloCheatSequence(activationCount, baseSeed) {
+        const safeCount = Math.max(0, Math.floor(Number(activationCount) || 0));
+        const pairs = 3 + Math.min(safeCount, SOLO_CHEAT_MAX_USES + 1);
+        const pool = ['1','2','3','4','5','6','7','8','9'];
+        const rng = _mulberry32((baseSeed >>> 0) + safeCount * 101);
+        const seq = [];
+        let last = null;
+
+        for (let i = 0; i < pairs; i++) {
+            let key;
+            do {
+                key = pool[Math.floor(rng() * pool.length)];
+            } while (pool.length > 1 && key === last);
+            last = key;
+            seq.push(key, key);
+        }
+        return seq;
+    }
+
+    function _mulberry32(seedValue) {
+        let s = seedValue >>> 0;
+        return function () {
+            s += 0x6d2b79f5;
+            let t = Math.imul(s ^ (s >>> 15), 1 | s);
+            t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    function _pickSoloCheatEffects() {
+        return [
+            { type: 'score_boost', duration: 30000 },
+            { type: 'slow_drop', duration: 30000, multiplier: 1.7 },
+        ];
     }
 
     /* ── Boot ─────────────────────────────────────────────────────── */

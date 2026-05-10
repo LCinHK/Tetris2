@@ -326,15 +326,19 @@ describe('Tetris2 Server', () => {
 
   /* ── Cheat codes ──────────────────────────────────────────────── */
   describe('Cheat codes', () => {
-    it('getCheatSequence returns escalating sequences', () => {
+    it('getCheatSequence returns correct digit lengths', () => {
       const seq0 = getCheatSequence(0, 12345, 'player_test');
-      const seq1 = getCheatSequence(1, 12345, 'player_test');
-      assert.ok(seq1.length > seq0.length, 'later sequences should be longer');
+      const seq2 = getCheatSequence(2, 12345, 'player_test');
+      const seq3 = getCheatSequence(3, 12345, 'player_test');
+      const seq4 = getCheatSequence(4, 12345, 'player_test');
 
-      // Pattern: every key is pressed twice (pairs)
-      for (let i = 0; i < seq1.length; i += 2) {
-        assert.equal(seq1[i], seq1[i + 1]);
-      }
+      assert.equal(seq0.length, 4);
+      assert.equal(seq2.length, 4);
+      assert.equal(seq3.length, 6);
+      assert.equal(seq4.length, 6);
+
+      const allDigits = seq3.every(k => /^[0-9]$/.test(k));
+      assert.ok(allDigits, 'sequence should be digits only');
     });
 
     it('activates cheat with correct sequence', async () => {
@@ -385,7 +389,7 @@ describe('Tetris2 Server', () => {
       send(ws, { type: 'player_ready' });
       await waitForType(ws, 'game_start');
 
-      send(ws, { type: 'cheat_activate', sequence: ['ArrowDown', 'ArrowDown'] });
+      send(ws, { type: 'cheat_activate', sequence: ['0', '0', '0', '0'] });
       const resp = await waitForType(ws, 'cheat_invalid');
       assert.ok(resp, 'should receive cheat_invalid');
       ws.close();

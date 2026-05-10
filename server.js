@@ -20,10 +20,11 @@ let clientIdCounter = 0;
 /* ─────────────────────────────────────────
    Cheat codes
 
-   Requirements:
-   - Randomised sequences (deterministic per game to keep tests stable)
-   - Pattern: each key is pressed twice (pairs)
-   - Escalating difficulty after each activation
+  Requirements:
+  - Randomised sequences (deterministic per game to keep tests stable)
+  - Number keys only
+  - First 3 activations: 4-digit sequence
+  - 4th and 5th activations: 6-digit sequence
    - Limited to 5 activations per player per game
     - Each activation grants all advantages:
       1) score boost (2× scoring for 30s)
@@ -32,8 +33,7 @@ let clientIdCounter = 0;
 
 const MAX_CHEAT_USES_PER_GAME = 5;
 
-const CHEAT_KEYS_ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-const CHEAT_KEYS_DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const CHEAT_KEYS_DIGITS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const VALID_GAME_MODES = new Set(['score_attack', 'time_attack']);
 
 function fnv1a32(input) {
@@ -55,29 +55,17 @@ function mulberry32(seed) {
   };
 }
 
-function _cheatKeyPool(activationCount) {
-  // Gradually add digit keys as sequences get harder.
-  if (activationCount >= 2) return [...CHEAT_KEYS_ARROWS, ...CHEAT_KEYS_DIGITS];
-  return [...CHEAT_KEYS_ARROWS];
-}
-
 function getCheatSequence(activationCount, gameSeed = 0, clientId = '') {
   const safeCount = Math.max(0, Math.floor(Number(activationCount) || 0));
-  const pairs = 3 + Math.min(safeCount, MAX_CHEAT_USES_PER_GAME + 1); // 3..9 pairs (beyond limit, still defined)
-  const pool = _cheatKeyPool(safeCount);
+  const length = safeCount < 3 ? 4 : 6;
+  const pool = CHEAT_KEYS_DIGITS;
 
   const seed = fnv1a32(`${gameSeed}:${clientId}:${safeCount}`);
   const rng = mulberry32(seed);
   const seq = [];
 
-  let last = null;
-  for (let i = 0; i < pairs; i++) {
-    let key;
-    do {
-      key = pool[Math.floor(rng() * pool.length)];
-    } while (pool.length > 1 && key === last);
-    last = key;
-    seq.push(key, key);
+  for (let i = 0; i < length; i++) {
+    seq.push(pool[Math.floor(rng() * pool.length)]);
   }
 
   return seq;
@@ -480,12 +468,6 @@ function handleRematchRequest(clientId, msg) {
 
   const code = String(msg.lobbyCode || player.lobbyCode || '').toUpperCase().trim();
   const lobby = lobbies.get(code);
-  console.log('[rematch] request', {
-    clientId,
-    code,
-    hasLobby: !!lobby,
-    playerLobby: player.lobbyCode || null,
-  });
   if (!lobby) {
     sendTo(clientId, { type: 'error', message: 'Lobby not found.' });
     return;
@@ -511,7 +493,6 @@ function handleRematchRequest(clientId, msg) {
     }
   }
 
-  console.log('[rematch] lobby players', { code, players: lobby.players, opponentId });
   if (!opponentId) {
     sendTo(clientId, { type: 'error', message: 'Opponent not connected for a rematch.' });
     return;
@@ -522,7 +503,6 @@ function handleRematchRequest(clientId, msg) {
     at: Date.now(),
   };
 
-  console.log('[rematch] invite sent', { to: opponentId, code });
   sendTo(opponentId, {
     type: 'rematch_invite',
     fromName: player.name,
@@ -539,30 +519,21 @@ function handleRematchResponse(clientId, msg) {
 
   const code = String(msg.lobbyCode || player.lobbyCode || '').toUpperCase().trim();
   const lobby = lobbies.get(code);
-  console.log('[rematch] response', {
-    clientId,
-    code,
-    accepted: msg.accepted === true,
-    hasLobby: !!lobby,
-  });
   if (!lobby) return;
 
   if (!player.lobbyCode) player.lobbyCode = code;
   if (!lobby.players.includes(clientId)) lobby.players.push(clientId);
 
   const pending = lobby.pendingRematch;
-  console.log('[rematch] pending', { code, pending });
   if (!pending || !lobby.players.includes(pending.fromId)) return;
 
   const accepted = msg.accepted === true;
   if (accepted) {
     lobby.readyPlayers = new Set();
     lobby.pendingRematch = null;
-    console.log('[rematch] accepted -> startGame', { code });
     startGame(code);
   } else {
     lobby.pendingRematch = null;
-    console.log('[rematch] declined', { code, fromId: pending.fromId });
     sendTo(pending.fromId, {
       type: 'rematch_declined',
       fromName: player.name || 'Opponent',
@@ -573,12 +544,6 @@ function handleRematchResponse(clientId, msg) {
 function startGame(code) {
   const lobby = lobbies.get(code);
   if (!lobby) return;
-
-  console.log('[game] startGame', {
-    code,
-    players: lobby.players,
-    status: lobby.status,
-  });
 
   lobby.lastPlayers = getLobbyPlayerList(code).map(p => ({ id: p.id, name: p.name }));
 

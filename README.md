@@ -36,7 +36,7 @@ A real-time, two-player competitive Tetris game built entirely with Node.js and 
 - 🃏 **Two game modes**: Score Attack, Time Attack (3 min)
 - 👻 **Ghost piece**, **hold piece**, **next piece preview**
 - 📊 **Per-session stats**: games played, high score, lines cleared, win/loss record, recent score history
-- 🔑 **Escalating cheat codes** (Konami-style arrow-key sequences) granting score boost + slow drop
+- 🔑 **Escalating cheat codes** (digit-only sequences) granting score boost + slow drop
 - ⚙️ **Persistent settings** (cheat on/off, sound on/off, default game mode) stored per WebSocket session
 - 🛡️ Path-traversal protection on the static file server
 - ✅ Unit-tested server with Node.js built-in test runner (no extra test framework)
@@ -198,10 +198,10 @@ Cheat codes are optional (toggled in Settings). When enabled, the server sends e
 ### Usage rules
 
 - **Max 5 activations per player per game**
-- Each activation unlocks a **harder** sequence (more keys)
 - Sequences are **randomised per game** (but deterministic from the game seed)
-- Sequence pattern: **every key must be pressed twice** (e.g. `↑ ↑ 4 4 → → ...`)
-- Keys may include **arrow keys** and (at higher difficulty) **digit keys** (`1`–`9`, top-row — no numpad required)
+- Activations **1–3** use a **4-digit** code
+- Activations **4–5** use a **6-digit** code
+- Digits are **0–9** (top-row or numpad)
 
 ### Effects
 
