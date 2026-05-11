@@ -79,6 +79,7 @@ Tetris2/
 │   ├── index.html         # Home / lobby page
 │   ├── game.html          # Active gameplay page
 │   ├── gameover.html      # Game-over results page
+│   ├── audio/             # Contains audio elements 
 │   ├── css/
 │   │   └── style.css      # All styling (dark theme, responsive)
 │   └── js/
@@ -88,6 +89,7 @@ Tetris2/
 │       ├── home.js        # Home-page controller (lobby create/join, stats display, settings)
 │       ├── cheat.js       # Client-side cheat-sequence detector
 │       └── gameover.js    # Game-over page controller
+├── sample/                # Contains graphic elements 
 └── test/
     └── server.test.js     # Server unit tests (HTTP, WebSocket, lobby, stats, cheats)
 ```
@@ -263,6 +265,6 @@ All messages are JSON objects with a `type` field.
 | Area | Status | Notes |
 |---|---|---|
 | **Sound effects** | ✅ Implemented | BGM, line-clear, lock, game-start, and game-over sounds play via `<Audio>` elements with `.mp3` files served as `audio/mpeg`. Playback is gated by the `soundEnabled` setting and a session flag. Browser autoplay policy may suppress audio until the first user gesture. |
+| **Play Again (multiplayer)** | ✅ Implemented | The game-over screen supports rematch flow: one player can request a rematch, the opponent can accept/decline, and accepted rematches start a new game in the same lobby without returning to Home. |
 | **Time Attack winner** | ⚠️ Partial | Both clients count down independently. The server awards a win/loss to whoever submits `game_over` last (the other player still playing at that moment). In practice times are nearly identical, but a future improvement would be a server-side adjudication message comparing both scores after both clocks expire. |
-| **Play Again (multiplayer)** | ⚠️ Redirect only | After a game ends the lobby is closed. "Play Again" returns to the home page where a fresh lobby must be created. Full in-place lobby restart would require additional server logic. |
 | **Mobile / touch controls** | ❌ Not implemented | Gameplay is keyboard-only. Touch/swipe support would need on-screen buttons or gesture detection. |
