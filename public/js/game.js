@@ -295,13 +295,38 @@
 
     let cheatTimerInterval = null;
     let cheatTimerEnd = 0;
+    let cheatTimerRemaining = 0;
+    let cheatTimerPaused = false;
 
-    function clearCheatTimer() {
+    function _stopCheatTimerInterval() {
         if (cheatTimerInterval) {
             clearInterval(cheatTimerInterval);
             cheatTimerInterval = null;
         }
+    }
+
+    function _updateCheatTimerDisplay() {
+        if (!cheatTimerDisplay) return;
+        const leftMs = Math.max(0, cheatTimerEnd - Date.now());
+        const leftSec = Math.ceil(leftMs / 1000);
+        cheatTimerDisplay.textContent = `Cheat active: ${leftSec}s`;
+        if (leftMs <= 0) {
+            clearCheatTimer();
+        }
+    }
+
+    function _runCheatTimerInterval() {
+        _stopCheatTimerInterval();
+        _updateCheatTimerDisplay();
+        cheatTimerInterval = setInterval(_updateCheatTimerDisplay, 250);
+    }
+
+    function clearCheatTimer() {
+        _stopCheatTimerInterval();
         if (cheatTimerDisplay) cheatTimerDisplay.textContent = '';
+        cheatTimerEnd = 0;
+        cheatTimerRemaining = 0;
+        cheatTimerPaused = false;
     }
 
     function startCheatTimer(durationMs) {
@@ -311,14 +336,25 @@
             return;
         }
 
+        _stopCheatTimerInterval();
+        cheatTimerPaused = false;
+        cheatTimerRemaining = durationMs;
         cheatTimerEnd = Date.now() + durationMs;
-        clearCheatTimer();
-        cheatTimerInterval = setInterval(() => {
-            const leftMs = Math.max(0, cheatTimerEnd - Date.now());
-            const leftSec = Math.ceil(leftMs / 1000);
-            cheatTimerDisplay.textContent = `Cheat active: ${leftSec}s`;
-            if (leftMs <= 0) clearCheatTimer();
-        }, 250);
+        _runCheatTimerInterval();
+    }
+
+    function pauseCheatTimer() {
+        if (!cheatTimerInterval || cheatTimerPaused) return;
+        cheatTimerRemaining = Math.max(0, cheatTimerEnd - Date.now());
+        cheatTimerPaused = true;
+        _stopCheatTimerInterval();
+    }
+
+    function resumeCheatTimer() {
+        if (!cheatTimerPaused || cheatTimerRemaining <= 0) return;
+        cheatTimerPaused = false;
+        cheatTimerEnd = Date.now() + cheatTimerRemaining;
+        _runCheatTimerInterval();
     }
 
     function tryActivateCheat() {
@@ -394,6 +430,9 @@
         }
         const paused = game.togglePause();
         paused ? pauseBgm() : resumeBgm();
+        paused ? pauseCheatTimer() : resumeCheatTimer();
+        paused ? cheat.pauseActive() : cheat.resumeActive();
+        paused ? game.pauseTimedEffects() : game.resumeTimedEffects();
         if (pauseOverlay) {
             paused ? pauseOverlay.classList.remove('hidden') : pauseOverlay.classList.add('hidden');
         }

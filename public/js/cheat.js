@@ -28,6 +28,9 @@
       this._progress   = [];   // keys entered so far
       this._active     = false;
       this._expiryTimer= null;
+      this._expiryAt   = 0;
+      this._remainingMs = 0;
+      this._paused     = false;
 
       this._keyHandler = this._onKey.bind(this);
     }
@@ -82,12 +85,41 @@
     /* Called by game.js when server confirms activation */
     markActive(durationMs) {
       this._active = true;
+      this._paused = false;
+      this._remainingMs = Math.max(0, Number(durationMs) || 0);
+      this._expiryAt = Date.now() + this._remainingMs;
       clearTimeout(this._expiryTimer);
-      this._expiryTimer = setTimeout(() => {
-        this._active = false;
-        this.onDeactivate();
-        this._renderKeys();
-      }, durationMs);
+      this._expiryTimer = setTimeout(() => this._expire(), this._remainingMs);
+      this._renderKeys();
+    }
+
+    pauseActive() {
+      if (!this._active || this._paused) return;
+      this._remainingMs = Math.max(0, this._expiryAt - Date.now());
+      clearTimeout(this._expiryTimer);
+      this._expiryTimer = null;
+      this._paused = true;
+    }
+
+    resumeActive() {
+      if (!this._active || !this._paused) return;
+      this._paused = false;
+      if (this._remainingMs <= 0) {
+        this._expire();
+        return;
+      }
+      this._expiryAt = Date.now() + this._remainingMs;
+      clearTimeout(this._expiryTimer);
+      this._expiryTimer = setTimeout(() => this._expire(), this._remainingMs);
+    }
+
+    _expire() {
+      this._active = false;
+      this._paused = false;
+      this._expiryTimer = null;
+      this._expiryAt = 0;
+      this._remainingMs = 0;
+      this.onDeactivate();
       this._renderKeys();
     }
 

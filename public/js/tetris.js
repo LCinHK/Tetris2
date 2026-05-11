@@ -102,6 +102,12 @@
             // Multiplier > 1 means slower (bigger interval between auto-drops).
             this.dropIntervalMultiplier = 1;
             this._slowDropTimer = null;
+            this._slowDropEnd = 0;
+            this._slowDropRemaining = 0;
+            this.scoreBoost = false;
+            this._scoreBoostTimer = null;
+            this._scoreBoostEnd = 0;
+            this._scoreBoostRemaining = 0;
 
             canvas.width = this.COLS * this.CELL;
             canvas.height = this.ROWS * this.CELL;
@@ -138,6 +144,12 @@
             this.dropIntervalMultiplier = 1;
             clearTimeout(this._slowDropTimer);
             this._slowDropTimer = null;
+            this._slowDropEnd = 0;
+            this._slowDropRemaining = 0;
+            clearTimeout(this._scoreBoostTimer);
+            this._scoreBoostTimer = null;
+            this._scoreBoostEnd = 0;
+            this._scoreBoostRemaining = 0;
             this._raf = null;
             this._rng = SeededRandom(seed);
             this._bag = [];
@@ -365,8 +377,16 @@
 
         /* Activate score-boost cheat */
         activateScoreBoost(durationMs) {
+            clearTimeout(this._scoreBoostTimer);
             this.scoreBoost = true;
-            setTimeout(() => { this.scoreBoost = false; }, durationMs);
+            this._scoreBoostRemaining = Math.max(0, Number(durationMs) || 0);
+            this._scoreBoostEnd = Date.now() + this._scoreBoostRemaining;
+            this._scoreBoostTimer = setTimeout(() => {
+                this.scoreBoost = false;
+                this._scoreBoostTimer = null;
+                this._scoreBoostEnd = 0;
+                this._scoreBoostRemaining = 0;
+            }, this._scoreBoostRemaining);
         }
 
         /* Slow down auto-drop for a limited time (cheat advantage) */
@@ -374,10 +394,48 @@
             const m = Math.max(1.05, Number(multiplier) || 1.7);
             this.dropIntervalMultiplier = m;
             clearTimeout(this._slowDropTimer);
+            this._slowDropRemaining = Math.max(0, Number(durationMs) || 0);
+            this._slowDropEnd = Date.now() + this._slowDropRemaining;
             this._slowDropTimer = setTimeout(() => {
                 this.dropIntervalMultiplier = 1;
                 this._slowDropTimer = null;
-            }, durationMs);
+                this._slowDropEnd = 0;
+                this._slowDropRemaining = 0;
+            }, this._slowDropRemaining);
+        }
+
+        pauseTimedEffects() {
+            if (this._scoreBoostTimer) {
+                this._scoreBoostRemaining = Math.max(0, this._scoreBoostEnd - Date.now());
+                clearTimeout(this._scoreBoostTimer);
+                this._scoreBoostTimer = null;
+            }
+            if (this._slowDropTimer) {
+                this._slowDropRemaining = Math.max(0, this._slowDropEnd - Date.now());
+                clearTimeout(this._slowDropTimer);
+                this._slowDropTimer = null;
+            }
+        }
+
+        resumeTimedEffects() {
+            if (this.scoreBoost && !this._scoreBoostTimer && this._scoreBoostRemaining > 0) {
+                this._scoreBoostEnd = Date.now() + this._scoreBoostRemaining;
+                this._scoreBoostTimer = setTimeout(() => {
+                    this.scoreBoost = false;
+                    this._scoreBoostTimer = null;
+                    this._scoreBoostEnd = 0;
+                    this._scoreBoostRemaining = 0;
+                }, this._scoreBoostRemaining);
+            }
+            if (this.dropIntervalMultiplier > 1 && !this._slowDropTimer && this._slowDropRemaining > 0) {
+                this._slowDropEnd = Date.now() + this._slowDropRemaining;
+                this._slowDropTimer = setTimeout(() => {
+                    this.dropIntervalMultiplier = 1;
+                    this._slowDropTimer = null;
+                    this._slowDropEnd = 0;
+                    this._slowDropRemaining = 0;
+                }, this._slowDropRemaining);
+            }
         }
 
         /* ── Game loop ─────────────────────────────────────────────── */
