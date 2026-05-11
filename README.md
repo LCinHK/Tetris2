@@ -133,10 +133,10 @@ npm install
 node server.js
 or
 npm start
-# → Tetris2 server running on http://localhost:3000
+# → Tetris2 server running on http://localhost:8000
 ```
 
-Open **http://localhost:3000** in your browser. To play multiplayer, open the same URL in two separate browser tabs (or share the URL with someone on the same network).
+Open **http://localhost:8000** in your browser. To play multiplayer, open the same URL in two separate browser tabs (or share the URL with someone on the same network).
 
 ### Configuration
 
