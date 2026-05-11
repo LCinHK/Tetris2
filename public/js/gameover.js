@@ -9,8 +9,8 @@
   let lastGame = {};
   let stats    = {};
   let settings = {};
-  try { lastGame = JSON.parse(localStorage.getItem('lastGame') || '{}'); } catch (_) {}
-  try { stats    = JSON.parse(localStorage.getItem('stats')    || '{}'); } catch (_) {}
+  try { lastGame = JSON.parse(sessionStorage.getItem('lastGame') || '{}'); } catch (_) {}
+  try { stats    = JSON.parse(sessionStorage.getItem('stats')    || '{}'); } catch (_) {}
   try { settings = JSON.parse(localStorage.getItem('settings') || '{}'); } catch (_) {}
 
   // One-time trigger from previous page: play win/gameover sound when requested.
@@ -42,6 +42,7 @@
   const isSolo = !hadOpponent;
   const opponent = lastGame.opponent || null;
   const lines  = lastGame.linesCleared || 0;
+  let pendingInvite = null;
 
 
   const wrapper = document.querySelector('.gameover-wrapper');
@@ -117,6 +118,10 @@
   const playAgainBtn = document.getElementById('playAgainBtn');
   if (playAgainBtn) {
     playAgainBtn.addEventListener('click', () => {
+      if (pendingInvite) {
+        respondToInvite(true);
+        return;
+      }
       if (isSolo) {
         startSoloGame();
         return;
@@ -148,18 +153,9 @@
   /* ── Rematch handlers (multiplayer) ─────────────────────────── */
   if (window.Network) {
     Network.on('rematch_invite', (msg) => {
-      const fromName = (msg && msg.fromName) ? msg.fromName : 'Your opponent';
-      const prompt = `${fromName} is inviting you to a rematch — ready for another round of Tetris?`;
-      const accepted = window.confirm(prompt);
-      Network.send({
-        type: 'rematch_response',
-        lobbyCode: msg && msg.lobbyCode ? msg.lobbyCode : (lastGame.lobbyCode || null),
-        accepted,
-      });
-      if (!accepted && playAgainBtn) {
-        playAgainBtn.disabled = false;
-        playAgainBtn.textContent = '▶ Play Again';
-      }
+      pendingInvite = msg || null;
+      if (subtitle) subtitle.textContent = 'Rematch invite received. Click Play Again to accept.';
+      promptInvite();
     });
 
     Network.on('rematch_declined', (msg) => {
@@ -177,6 +173,12 @@
     });
   }
 
+  window.addEventListener('focus', () => {
+    if (pendingInvite) {
+      promptInvite();
+    }
+  });
+
   /* ── Helpers ─────────────────────────────────────────────────── */
   function _setText(id, val) {
     const el = document.getElementById(id);
@@ -185,7 +187,7 @@
 
   function startSoloGame() {
     const mode = lastGame.gameMode || settings.gameMode || 'score_attack';
-    localStorage.setItem('currentGame', JSON.stringify({
+    sessionStorage.setItem('currentGame', JSON.stringify({
       gameMode: mode,
     }));
     window.location.href = '/game.html';
@@ -193,7 +195,7 @@
 
   function startNetworkGame(msg) {
     if (!msg) return;
-    localStorage.setItem('currentGame', JSON.stringify({
+    sessionStorage.setItem('currentGame', JSON.stringify({
       lobbyCode: msg.lobbyCode || lastGame.lobbyCode || null,
       gameMode: msg.gameMode || lastGame.gameMode || 'score_attack',
       seed: msg.seed,
@@ -217,5 +219,30 @@
       Network.send({ type: 'rematch_request', lobbyCode });
     };
     Network.on('open', onOpen);
+  }
+
+  function promptInvite() {
+    if (!pendingInvite) return;
+    if (document.hidden || !document.hasFocus()) {
+      return;
+    }
+    const fromName = (pendingInvite && pendingInvite.fromName) ? pendingInvite.fromName : 'Your opponent';
+    const prompt = `${fromName} is inviting you to a rematch — ready for another round of Tetris?`;
+    const accepted = window.confirm(prompt);
+    respondToInvite(accepted);
+  }
+
+  function respondToInvite(accepted) {
+    if (!pendingInvite) return;
+    Network.send({
+      type: 'rematch_response',
+      lobbyCode: pendingInvite && pendingInvite.lobbyCode ? pendingInvite.lobbyCode : (lastGame.lobbyCode || null),
+      accepted,
+    });
+    pendingInvite = null;
+    if (!accepted && playAgainBtn) {
+      playAgainBtn.disabled = false;
+      playAgainBtn.textContent = '▶ Play Again';
+    }
   }
 })();

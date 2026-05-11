@@ -130,6 +130,8 @@ Tetris2/
 npm install
 
 # 2. Start the server
+node server.js
+or
 npm start
 # → Tetris2 server running on http://localhost:3000
 ```

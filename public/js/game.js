@@ -5,9 +5,9 @@
 (function () {
     'use strict';
 
-    /* ── Read game config from localStorage ─────────────────────── */
+    /* ── Read game config from sessionStorage ───────────────────── */
     let gameConfig = {};
-    try { gameConfig = JSON.parse(localStorage.getItem('currentGame') || '{}'); } catch (_) { }
+    try { gameConfig = JSON.parse(sessionStorage.getItem('currentGame') || '{}'); } catch (_) { }
 
     let settings = {};
     try { settings = JSON.parse(localStorage.getItem('settings') || '{}'); } catch (_) { }
@@ -491,7 +491,7 @@
             lobbyCode: gameConfig.lobbyCode || null,
         });
 
-        localStorage.setItem('lastGame', JSON.stringify({
+        sessionStorage.setItem('lastGame', JSON.stringify({
             score: finalScore,
             linesCleared: finalLines,
             level: finalLevel,
@@ -511,7 +511,7 @@
             if (msg.stats) {
                 const localStats = _loadLocalStats();
                 const merged = _mergeStats(localStats, msg.stats);
-                localStorage.setItem('stats', JSON.stringify(merged));
+                sessionStorage.setItem('stats', JSON.stringify(merged));
             }
             nav();
         });
@@ -599,7 +599,7 @@
     }
 
     function _loadLocalStats() {
-        try { return JSON.parse(localStorage.getItem('stats') || '{}'); }
+        try { return JSON.parse(sessionStorage.getItem('stats') || '{}'); }
         catch (_) { return {}; }
     }
 
@@ -682,19 +682,14 @@
 
     function _getSoloCheatSequence(activationCount, baseSeed) {
         const safeCount = Math.max(0, Math.floor(Number(activationCount) || 0));
-        const pairs = 3 + Math.min(safeCount, SOLO_CHEAT_MAX_USES + 1);
-        const pool = ['1','2','3','4','5','6','7','8','9'];
+        const length = safeCount < 3 ? 4 : 6;
+        const pool = ['0','1','2','3','4','5','6','7','8','9'];
         const rng = _mulberry32((baseSeed >>> 0) + safeCount * 101);
         const seq = [];
-        let last = null;
 
-        for (let i = 0; i < pairs; i++) {
-            let key;
-            do {
-                key = pool[Math.floor(rng() * pool.length)];
-            } while (pool.length > 1 && key === last);
-            last = key;
-            seq.push(key, key);
+        for (let i = 0; i < length; i++) {
+            const key = pool[Math.floor(rng() * pool.length)];
+            seq.push(key);
         }
         return seq;
     }
