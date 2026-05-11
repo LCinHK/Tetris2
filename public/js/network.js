@@ -10,7 +10,7 @@
     ws: null,
     _handlers: {},
     clientId: null,
-    playerName: localStorage.getItem('playerName') || '',
+    playerName: sessionStorage.getItem('playerName') || '',
 
     connect() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';

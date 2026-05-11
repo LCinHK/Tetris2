@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const crypto = require('crypto');
+const readline = require('readline');
 
 const PORT = process.env.PORT || 8000;
 
@@ -493,6 +494,12 @@ function handleRematchRequest(clientId, msg) {
     }
   }
 
+  if (lobby.pendingRematch && lobby.pendingRematch.fromId !== clientId) {
+    lobby.pendingRematch = null;
+    startGame(code);
+    return;
+  }
+
   if (!opponentId) {
     sendTo(clientId, { type: 'error', message: 'Opponent not connected for a rematch.' });
     return;
@@ -740,6 +747,37 @@ function handleSaveSettings(clientId, msg) {
    Start (only when run directly)
 ───────────────────────────────────────── */
 if (require.main === module) {
+  let shutdownPromptActive = false;
+  let shutdownInterface = null;
+
+  function requestShutdown() {
+    if (shutdownPromptActive) return;
+    if (!process.stdin.isTTY) {
+      process.exit(0);
+      return;
+    }
+
+    shutdownPromptActive = true;
+    if (!shutdownInterface) {
+      shutdownInterface = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+    }
+
+    // Only accept Y/YES to exit; anything else continues running.
+    shutdownInterface.question('Stop server? (Y to quit, N to continue): ', (answer) => {
+      const normalized = String(answer || '').trim().toLowerCase();
+      if (normalized === 'y' || normalized === 'yes') {
+        server.close(() => process.exit(0));
+        return;
+      }
+      shutdownPromptActive = false;
+    });
+  }
+
+  process.on('SIGINT', requestShutdown);
+
   server.listen(PORT, () => {
     console.log(`Tetris2 server running on http://localhost:${PORT}`);
   });
